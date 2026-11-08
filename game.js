@@ -43,6 +43,17 @@ let YL = '#fd4', WH = '#fff', CY = '#4df', PK = '#ff3ca6', PL = '#f6b919', DK = 
 // a.forEach(f) in fewer bytes (the minifier keeps the call short).
 let FE = (a, f) => a.forEach(f);
 // Run f(i) for i = 0..n-1.
+let Z7 = (n) => String(n).padStart(7, '0');
+// Square-wave blink: alternates 0/1 every n ms.
+let bl = (t, n) => (t / n | 0) % 2;
+// Within dx/dy of each other on the floor.
+let nr = (a, b, dx, dy) => ABS(a.x - b.x) < dx && ABS(a.y - b.y) < dy;
+let rn = (n) => RND() * n | 0;
+// Floating text above an actor.
+let pp = (o, dy, t, col, sz) => pop(o.x, o.y - dy, t, col, sz);
+let hc = (p) => css(p.h.c);
+let uc = (y, t, sz, d, col) => ut(W / 2, y, t, sz, d, col);
+let RC = (...a) => AD.rectangle(...a);
 let rp = (n, f) => { for (let i = 0; i < n; i++) f(i); };
 // Canvas fill / stroke colour setters (shorter than the property assignments).
 let FS = (c, v) => { c.fillStyle = v; }, SS = (c, v) => { c.strokeStyle = v; };
@@ -157,8 +168,8 @@ let sd = 1;
 let rr = () => (sd = sd * 16807 % 2147483647) / 2147483647;
 let ri = (a, b) => a + rr() * (b - a) | 0;
 
-// DM: end time of the attract demo (0 = a real game). KY: a real key was pressed.
-let S, AD, CM, MODE, L, HUD, st, P = [null, null], E = [], PR = [], IT = [], AL = [], WO = [], UI = [], FIN = [], frz = 0, DM = 0, KY = 0;
+// DM: end time of the attract demo (0 = a real game). KY: a real key was pressed. AT: grunt whose melee hit is being applied. TK: tokens collected this run.
+let S, AD, CM, MODE, L, HUD, st, P = [null, null], E = [], PR = [], IT = [], AL = [], WO = [], UI = [], FIN = [], frz = 0, DM = 0, KY = 0, AT = 0, TK = 0;
 let G = {};
 
 // ---------- Heroes, enemies, stages ----------
@@ -202,7 +213,7 @@ let STG = [
   { n: 'PATAGONIA', s: 'Donde el diablo perdió el poncho', pool: 'tk,dg,dr,ex', b: ['CAPITÁN GLACIAR', 'b4', 1.95, 620, 'pcht', '¡Acá manda el viento, cabros!'], sg: [['TORRES DEL PAINE', 0x2a7a3a, 1500]] },
   { n: 'COSTANERA CENTER', s: 'Piso 62 · láseres de seguridad', pool: 'gd,tk,ex,dr,dg', b: ['EL CÓNDOR', 'cd', 1.3, 750, 'csmth', 'Todos los tokens son míos.'], sg: [] },
 ];
-let SL = ['¡WENA!', '¡BACÁN!', '¡TOMA, PO!', '¡CHAO!', '¡SEEE!', '¡FUISTE!', '¡PA LA CASA!', '¡CACHAI!', '¡LA RAJA!', '¡AL TIRO!', '¡SALTA PAL LAO!'];
+let SL = ['¡WENA!', '¡BACÁN!', '¡TOMA, PO!', '¡CHAO!', '¡SEEE!', '¡FUISTE!', '¡CACHAI!', '¡LA RAJA!', '¡AL TIRO!'];
 let ITEMS = [['¡COMPLETO, UN MANJAR!', '#fc2'], ['¡PLÁTANO HACK!', PL], ['¡BIP! +500', CY], ['¡MOTE CON HUESILLO!', '#fa4']];
 
 // ---------- Procedural art ----------
@@ -368,7 +379,6 @@ let tag = (c, x, y, w) => {
 }
 let txtC = (c, t, x, y, sz, col) => { c.font = 'bold ' + sz + 'px monospace'; c.textAlign = 'center'; FS(c, col); c.fillText(t, x, y); }
 
-let cloud = (c, x, y) => { FS(c, 'rgba(255,255,255,.85)'); FE([[0, 0, 40], [34, -12, 30], [64, 2, 34]], ([a, b, r]) => { DOT(c, x + a, y + b, r, r * 0.6); }); };
 // Skies: 0 Santiago golden hour, 1 Providencia dusk, 2 Valpo day, 3 Atacama dusk, 4 Patagonia, 5 Costanera night, 6 title dusk.
 let DUSK = ['#113', '#428', '#b49', '#f87', '#fb7'];
 let SKY = [['#79d', '#cbe', '#fc9'], DUSK, ['#49e', '#acf', '#eef'], ['#225', '#948', '#f96', '#fc8'], ['#36b', '#9ce', '#fdc'], ['#001', '#112', '#224'], DUSK];
@@ -386,7 +396,6 @@ let farLayer = (s) => {
       c.font = 'italic 900 38' + FONT; LW(c, 6); SS(c, YL); c.strokeText('STGO', 40, 380); FS(c, PK); c.fillText('STGO', 40, 380);
     }
     if (s === 0) { ridge(c, 300, 190, 50, '#88b', '#fee'); ridge(c, 345, 70, 40, '#a9b'); tower(c, 600, '#99b'); city(c, '#aac', 0, 30, 110); }
-    if (s === 2 || s === 4) { cloud(c, 90, 70); cloud(c, 470, 46); }
     if (s === 2) {
       FR(c, '#26b', 0, 250, 800, 140);
       rp(60, (i) => { FR(c, 'rgba(255,255,255,.35)', ri(0, 800), ri(255, 385), ri(8, 30), 2); });
@@ -609,7 +618,7 @@ let txt = (x, y, s, sz, col, ox = 0.5) => AD.text(x, y, s, TS(sz, col)).setOrigi
 // UI text in one call: ut(x, y, text, size, depth = 10, color, originX).
 let ut = (x, y, t, sz, d = 10, col, ox) => ui(txt(x, y, t, sz, col, ox), d);
 // Full-screen dim overlay and a tween shorthand (k: destroy the target when done).
-let dim = (a, d = 3, k = 0x0a0614) => ui(AD.rectangle(W / 2, H / 2, W, H, k, a), d);
+let dim = (a, d = 3, k = 0x0a0614) => ui(RC(W / 2, H / 2, W, H, k, a), d);
 let tw = (t, o, k) => S.tweens.add({ targets: t, ...o, onComplete: k && (() => t.destroy()) });
 // Fade out over d ms after dl ms; destroys the object unless k is 0.
 let fo = (t, d, dl = 0, k = 1) => tw(t, { alpha: 0, duration: d, delay: dl }, k);
@@ -622,7 +631,9 @@ let clearWorld = () => {
   FE(WO, (o) => o.destroy()); WO = [];
   FE(P, (p) => { if (p && p.s) { p.s.destroy(); p.sd.destroy(); p.s = null; } });
 }
-function camX() { return CM.scrollX; }
+let camX = () => CM.scrollX;
+// Switch screens: drop all UI and world objects, set the mode and reset the camera.
+let scr = (m) => { clearAll(); clearWorld(); MODE = m; CM.setScroll(0, 0); };
 let bgSet = (i) => {
   return {
     f: TL(0, 0, W, FLOOR, 'f' + i, 0),
@@ -658,14 +669,9 @@ let pop = (x, y, t, col = WH, sz = 16) => {
   tw(o, { y: y - 40, alpha: { from: 1, to: 0 }, duration: 1100, ease: 'Quad.In' }, 1);
 }
 let boom = (x, y) => { rp(4, (i) => { spark(x + (RND() - 0.5) * 40, y + (RND() - 0.5) * 40, i % 2 ? 0xffa040 : 0xffffff); }); ring(x, y + 30, 50, 0xffa040); SFX_boom(); }
-let ghost = (p) => {
-  let g = hum(p.s.x, p.s.y, p.s.texture.key).setFlipX(p.f < 0).setTintFill(p.h.c).setAlpha(0.55).setDepth(p.y - 1);
-  fo(g, 260);
-}
 let zap = (x1, y1, x2, y2, col) => fo(AD.line(0, 0, x1, y1, x2, y2, col).setOrigin(0).setLineWidth(3).setDepth(1998), 120);
 let debris = (e) => { dust(e.x, e.y, 5); spark(e.x, e.y - 20, e.v ? 0xb8864a : 0x3a9a4a); SFX_thud(); }
-// Function declarations (not arrows) so the minifier keeps tn/camX as short calls instead of inlining them.
-function tn() { return S.time.now; }
+let tn = () => S.time.now;
 // A player who is still in the game (not out of lives).
 let live = (p) => p && p.st !== 'o';
 let later = (ms, f) => S.time.delayedCall(ms, f);
@@ -707,15 +713,15 @@ let update = (time, delta) => {
 }
 
 // ---------- Title ----------
-let recStr = () => board.slice(0, 5).map((e, i) => `${i + 1}. ${e.n.padEnd(3)} ${String(e.s).padStart(7, '0')}`).join('\n') || 'SIN RÉCORDS AÚN\n¡SÉ EL PRIMERO!';
+let recStr = () => board.slice(0, 5).map((e, i) => `${i + 1}. ${e.n.padEnd(3)} ${Z7(e.s)}`).join('\n') || 'SIN RÉCORDS AÚN\n¡SÉ EL PRIMERO!';
 let title = () => {
-  clearAll(); clearWorld(); MODE = 't'; CM.setScroll(0, 0); G.dm = 0;
+  scr('t'); G.dm = 0;
   duskBg();
   let lg =ui(AD.image(W / 2, 150, 'logo').setScale(0.84), 10);
   tw(lg, { y: 143, yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.InOut' });
-  ut(W / 2, 286, 'CONDOR CORP SE ROBÓ TODOS LOS TOKENS. ¡A RECUPERARLOS!', 15, 10, YL);
-  G.ic = ut(W / 2, 318, '>>> INSERT COIN <<<', 22, 10, YL);
-  G.st = ut(W / 2, 346, 'PRESIONA START', 22);
+  uc(286, 'CONDOR CORP SE ROBÓ TODOS LOS TOKENS. ¡A RECUPERARLOS!', 15, 10, YL);
+  G.ic = uc(318, '>>> INSERT COIN <<<', 22, 10, YL);
+  G.st = uc(346, 'PRESIONA START', 22);
   // Heroes stand on the wet street under their name badges.
   G.hs = HER.map((h, i) => {
     let x = 160 + i * 160;
@@ -725,15 +731,15 @@ let title = () => {
   logoBadge(70, 62, 0.62);
   ut(730, 40, 'RÉCORDS', 14, 10, YL);
   G.rt = ui(AD.text(730, 54, recStr(), TS(11, WH)).setOrigin(0.5, 0), 10);
-  ut(W / 2, 584, '1 O 2 JUGADORES · 6 ETAPAS · DE SANTIAGO A LA PATAGONIA', 11, 10, '#aac');
+  uc(584, '1 O 2 JUGADORES · 6 ETAPAS', 11, 10, '#aac');
   playSong(SONG.t);
 }
 // Controls line, shown on the select screen and at the start of stage 1.
-let HELP = 'B1 GOLPE · MANTÉN B1: BLOQUEO · B2 SALTO · B3 HACKEO';
+let HELP = 'B1 GOLPE · MANTÉN: BLOQUEO (JUSTO: PARRY) · B2 SALTO · B3 HACKEO';
 let SHOW = ['i0', 'i1', 'i0', 'i1', 'p1', 'p2', 'k', 'i0', 's', 's', 'i1', 'i0'];
 let upTitle = (dt, now) => {
   G.tx = (G.tx || 0) + dt * 1.2; scrollBg(G.tx);
-  G.st.setAlpha((now / 450 | 0) % 2 ? 1 : 0.25); G.ic.setAlpha((now / 450 | 0) % 2 ? 0.35 : 1);
+  G.st.setAlpha(bl(now, 450) ? 1 : 0.25); G.ic.setAlpha(bl(now, 450) ? 0.35 : 1);
   FE(G.hs, (a, i) => FE(a, (s) => s.setTexture('h' + i + '_' + SHOW[((now / 300 | 0) + i * 3) % 12])));
   // 6 s without input starts the attract demo.
   if (KY || !G.dm) { KY = 0; G.dm = now + 6000; }
@@ -741,18 +747,20 @@ let upTitle = (dt, now) => {
 }
 // Attract demo: two bots play a random stage, starting at its first wave, for 25 s.
 function demo() {
-  let a = RND() * 4 | 0;
+  let a = rn(4);
   P = [newP(0, a), newP(1, (a + 1 + RND() * 3) % 4 | 0)];
-  stage(RND() * 6 | 0);
+  stage(rn(6));
   DM = tn() + 25000; KY = 0;
-  CM.scrollX = 650; FE(P, (p) => { p.x += 650; });
-  ut(W / 2, 100, 'DEMO · PRESIONA START', 16, 6000, YL);
+  // 40% of demos start at the boss; the rest at the first wave.
+  let ox = 650; if (RND() < 0.4) { st.wi = 2; ox = 2000; }
+  CM.scrollX = ox; FE(P, (p) => { p.x += ox; });
+  uc(100, 'DEMO · PRESIONA START', 16, 6000, YL);
 }
 // Demo bot: walk to the nearest foe, line up and punch (special when HACK allows).
 let bot = (p, now) => {
   let e = nearE(p, 1e9);
   let k = (c, v) => { held[p.pre + c] = v; }, dx = e ? e.x - p.x : 99, dy = e ? e.y - p.y : 0, go = ABS(dx) > 46;
-  let hit = e && !go && ABS(dy) < 14 && (now / 60 | 0) % 2;
+  let hit = e && !go && ABS(dy) < 14 && bl(now, 60);
   k('R', dx > 0 && (go || p.f < 0)); k('L', dx < 0 && (go || p.f > 0));
   k('D', dy > 6); k('U', dy < -6);
   k(1, hit && p.hk < 50); k(3, hit && p.hk > 49);
@@ -763,7 +771,7 @@ let sel = (pi) => {
   clearAll(); MODE = 's'; SFX_pk();
   L = bgSet(0);
   dim(0.6);
-  ut(W / 2, 48, 'ELIGE TU HACKER', 34, 10, YL);
+  uc(48, 'ELIGE TU HACKER', 34, 10, YL);
   G.j = [pi === 0, pi === 1]; G.cu = [0, 3]; G.lk = [-1, -1]; G.go = 0;
   G.cards = HER.map((h, i) => {
     let x = 130 + i * 180;
@@ -773,15 +781,15 @@ let sel = (pi) => {
     ut(x, 386, h.d, 11, 11, css(h.c));
     FE(['VEL', 'FUERZA', 'HACK'], (l, k) => {
       ut(x - 72, 412 + k * 20, l, 11, 11, '#aaa', 0);
-      rp(5, (q) => { ui(AD.rectangle(x + 4 + q * 14, 412 + k * 20, 11, 9, q < h.st[k] ? h.c : 0x333344), 11); });
+      rp(5, (q) => { ui(RC(x + 4 + q * 14, 412 + k * 20, 11, 9, q < h.st[k] ? h.c : 0x333344), 11); });
     });
     ut(x, 474, '> B3: ' + h.b, 11, 11, WH);
     return { x, g, im };
   });
   G.tags = [ut(0, 0, '1P', 20, 12, PK), ut(0, 0, '2P', 20, 12, CY)];
-  ut(W / 2, 510, 'JOYSTICK: ELEGIR · B1: CONFIRMAR', 13, 10, '#ccc');
-  G.jn = ut(W / 2, 534, '', 13, 10, CY);
-  ut(W / 2, 568, HELP, 12, 10, YL);
+  uc(510, 'JOYSTICK: ELEGIR · B1: CONFIRMAR', 13, 10, '#ccc');
+  G.jn = uc(534, '', 13, 10, CY);
+  uc(568, HELP, 12, 10, YL);
   logoBadge(740, 50, 0.4);
 }
 let upSel = (dt, now) => {
@@ -804,10 +812,10 @@ let upSel = (dt, now) => {
     c.im.setTexture('h' + i + '_' + (l >= 0 ? 's' : SHOW[((now / 300 | 0) + i * 3) % 12]));
   });
   FE([0, 1], (pi) => { let t = G.tags[pi]; t.setVisible(G.j[pi]); t.setPosition(G.cards[G.cu[pi]].x + (pi ? 30 : -30), 176); });
-  G.jn.setText(G.j[0] && G.j[1] ? '' : (G.j[0] ? 'P2' : 'P1') + ': PRESIONA START PARA UNIRTE').setAlpha((now / 400 | 0) % 2 ? 1 : 0.3);
+  G.jn.setText(G.j[0] && G.j[1] ? '' : (G.j[0] ? 'P2' : 'P1') + ': PRESIONA START PARA UNIRTE').setAlpha(bl(now, 400) ? 1 : 0.3);
   if (!G.go && [0, 1].every((pi) => !G.j[pi] || G.lk[pi] >= 0)) G.go = now + 700;
   if (G.go && now > G.go) {
-    FIN = [];
+    FIN = []; TK = 0;
     P = [0, 1].map((pi) => (G.j[pi] ? newP(pi, G.lk[pi]) : null));
     stage(0);
   }
@@ -842,9 +850,9 @@ let reach = (p, e, r) => {
 }
 let strike = (p, mult, kn, r) => { FE(E, (e) => { if (reach(p, e, r)) hurtE(e, p.h.pw * mult, kn, p); }); }
 let special = (p) => {
-  if (p.hk < 50) { pop(p.x, p.y - 110, 'FALTA HACK', '#99a'); SFX_bz(); return; }
+  if (p.hk < 50) { pp(p, 110, 'FALTA HACK', '#99a'); SFX_bz(); return; }
   p.hk -= 50; setSt(p, 'x'); p.hitd.clear(); SFX_zap();
-  pop(p.x, p.y - 120, p.h.cry, css(p.h.c), 22);
+  pp(p, 120, p.h.cry, hc(p), 22);
   CM.flash(120, p.h.c >> 16, p.h.c >> 8 & 255, p.h.c & 255);
   let x = p.h.x;
   if (x === 'drone') AL.push({ ow: p, x: p.x, y: p.y, z: 90, life: 7000, cd: 0, s: AD.image(p.x, p.y, 'dr0').setOrigin(0.5, 1).setTint(0xffa040) });
@@ -861,6 +869,9 @@ let special = (p) => {
 let upP = (p, dt, now) => {
   if (p.st === 'o') return;
   let ms = dt * 16.67, pre = p.pre;
+  // Input buffer: a button pressed up to 130 ms early (mid-punch, before landing) still fires.
+  rp(3, (k) => { if (btn(pre, k + 1)) p.bf = [k + 1, now]; });
+  let bf = (n) => p.bf && p.bf[0] === n && now - p.bf[1] < 130 ? (p.bf = 0, 1) : 0;
   let mx = (held[pre + 'R'] ? 1 : 0) - (held[pre + 'L'] ? 1 : 0), my = (held[pre + 'D'] ? 1 : 0) - (held[pre + 'U'] ? 1 : 0);
   p.t += ms; if (p.inv > 0) p.inv -= ms; if (p.fl > 0) p.fl -= ms;
   if (p.z > 0 || p.vz > 0) {
@@ -879,9 +890,9 @@ let upP = (p, dt, now) => {
     // Providencia's wet floor keeps momentum, so players slide when they stop or turn.
     p.vx = st.i === 1 ? (p.vx || 0) + (mx * p.h.sp - (p.vx || 0)) * 0.06 * dt : mx * p.h.sp;
     p.x += p.vx * dt; p.y += my * p.h.sp * 0.65 * dt; p.st = mx || my ? 'w' : 'i';
-    if (btn(pre, 1)) { p.cb = now - p.lt < 480 && p.cb < 3 ? p.cb + 1 : 1; p.lt = now; setSt(p, 'a'); SFX_sw(); }
-    else if (btn(pre, 2)) { p.vz = 10; p.z = 0.1; setSt(p, 'j'); SFX_jp(); squ(p, -0.2); }
-    else if (btn(pre, 3)) special(p);
+    if (bf(1)) { p.cb = now - p.lt < 480 && p.cb < 3 ? p.cb + 1 : 1; p.lt = now; setSt(p, 'a'); SFX_sw(); }
+    else if (bf(2)) { p.vz = 10; p.z = 0.1; setSt(p, 'j'); SFX_jp(); squ(p, -0.2); }
+    else if (bf(3)) special(p);
     // Hold Hit after the punch to guard: the press attacks (edge), holding blocks (level).
     else if (held[pre + 1] || held[pre + 4]) setSt(p, 'b');
   } else if (s === 'b') { if (!held[pre + 1] && !held[pre + 4]) setSt(p, 'i'); }
@@ -892,7 +903,7 @@ let upP = (p, dt, now) => {
   } else if (s === 'j' || s === 'jk') {
     if (mx) p.f = mx;
     p.x += mx * p.h.sp * dt;
-    if (s === 'j' && btn(pre, 1)) { setSt(p, 'jk'); p.hitd.clear(); SFX_sw(); }
+    if (s === 'j' && bf(1)) { setSt(p, 'jk'); p.hitd.clear(); SFX_sw(); }
     if (p.st === 'jk') FE(E, (e) => { if (!p.hitd.has(e) && reach(p, e, p.h.rg + 12)) { p.hitd.add(e); hurtE(e, p.h.pw * 1.4, 1, p); } });
   } else if (s === 'h') { if (p.t > 280) setSt(p, 'i'); }
   // Co-op rescue: a KO'd hero waits up to 4.5 s; a partner standing beside them for 0.5 s gets them back up.
@@ -901,15 +912,15 @@ let upP = (p, dt, now) => {
       let m = P.find((q) => q !== p && live(q) && q.hp > 0);
       if (p.hp > 0) { setSt(p, 'i'); p.inv = 1000; }
       else if (!m || p.t > 4500) loseLife(p);
-      else if (ABS(m.x - p.x) < 60 && ABS(m.y - p.y) < 30) { if ((p.rv = (p.rv || 0) + ms) > 500) { p.rv = 0; p.hp = 40; setSt(p, 'i'); p.inv = 1500; pop(p.x, p.y - 100, '¡ARRIBA!', css(p.h.c), 20); SFX_pk(); } }
-      else { p.rv = 0; if ((p.t / 900 | 0) !== p.ah) { p.ah = p.t / 900 | 0; pop(p.x, p.y - 90, '¡AYUDA!', css(p.h.c), 18); } }
+      else if (nr(m, p, 60, 30)) { if ((p.rv = (p.rv || 0) + ms) > 500) { p.rv = 0; p.hp = 40; setSt(p, 'i'); p.inv = 1500; pp(p, 100, '¡ARRIBA!', hc(p), 20); SFX_pk(); } }
+      else { p.rv = 0; if ((p.t / 900 | 0) !== p.ah) { p.ah = p.t / 900 | 0; pp(p, 90, '¡AYUDA!', hc(p), 18); } }
     }
   }
   else if (s === 'x') {
     if (p.h.x === 'dash' && p.t < 340) {
       p.x += p.f * 12 * dt;
-      FE(E, (e) => { if (!p.hitd.has(e) && !e.dead && ABS(e.x - p.x) < 44 && ABS(e.y - p.y) < 26) { p.hitd.add(e); hurtE(e, 30, 1, p, 1); } });
-      if ((p.t / 40 | 0) !== p.gh) { p.gh = p.t / 40 | 0; ghost(p); }
+      FE(E, (e) => { if (!p.hitd.has(e) && !e.dead && nr(e, p, 44, 26)) { p.hitd.add(e); hurtE(e, 30, 1, p, 1); } });
+     
     }
     if (p.t > 360) setSt(p, 'i');
   }
@@ -919,9 +930,12 @@ let upP = (p, dt, now) => {
 // ub: unblockable (shockwaves, stage hazards).
 let hurtP = (p, d, kn, fx, ub) => {
   if (p.st === 'o' || p.st === 'd' || p.inv > 0 || (p.st === 'x' && p.h.x === 'dash')) return;
+  let gd = p.st === 'b' && !ub && (fx - p.x) * p.f > 0;
+  // Perfect parry: a guard raised within 180 ms of the hit cancels it, stuns the grunt (a boss stays open 0.6 s) and refunds HACK.
+  if (gd && p.t < 180) { p.hk = MN(100, p.hk + 10); p.sc += 100; ring(p.x, p.y, 70, 0x80e0ff); pp(p, 120, '¡PARRY!', CY, 22); SFX_pk(); frz = tn() + 90; if (AT) AT.boss ? AT.st === 'a' && (AT.tm -= 600) : es(AT, 'u'); return; }
   // Guarding a frontal hit: only chip damage, a small push and a clank.
-  if (p.st === 'b' && !ub && (fx - p.x) * p.f > 0) { p.hp = MX(1, p.hp - d / 6); p.x -= p.f * 8; squ(p, 0.1); spark(p.x + p.f * 14, p.y - 60, 0x80e0ff); SFX_blk(); return; }
-  p.hp = MX(0, p.hp - d); p.fl = 120; p.ch = 0; squ(p, 0.15); SFX_hu(); shake(120, 0.006); spark(p.x, p.y - p.z - 50, 0xff4040);
+  if (gd) { p.hp = MX(1, p.hp - d / 6); p.x -= p.f * 8; squ(p, 0.1); spark(p.x + p.f * 14, p.y - 60, 0x80e0ff); SFX_blk(); return; }
+  p.hp = MX(0, p.hp - d); p.fl = 120; p.ch = 0; st.dm += d; squ(p, 0.15); SFX_hu(); shake(120, 0.006); spark(p.x, p.y - p.z - 50, 0xff4040);
   if (p.hp <= 0 || kn) { setSt(p, 'd'); p.vz = 6.5; p.z = MX(p.z, 0.1); p.kx = (p.x > fx ? 1 : -1) * 4; p.f = p.kx > 0 ? -1 : 1; }
   else { setSt(p, 'h'); p.inv = 450; }
 }
@@ -930,11 +944,11 @@ let loseLife = (p) => {
   p.lives -= !DM;
   if (p.lives > 0) {
     Object.assign(p, { hp: 100, z: 380, vz: 0, x: camX() + W / 2, inv: 2500 });
-    setSt(p, 'j'); pop(p.x, 300, '¡VOLVÍ!', css(p.h.c), 20);
+    setSt(p, 'j'); pop(p.x, 300, '¡VOLVÍ!', hc(p), 20);
   } else {
     p.st = 'o'; p.s.setVisible(false); p.sd.setVisible(false);
     FIN.push({ s: p.sc, h: p.hi, pi: p.pi });
-    pop(p.x, p.y - 80, 'FUERA', '#f44', 22);
+    pp(p, 80, 'FUERA', '#f44', 22);
   }
 }
 let pfr = (p, now) => {
@@ -945,7 +959,7 @@ let pfr = (p, now) => {
   if (s === 'h' || s === 'd') return 'h';
   if (s === 'x') return p.h.x === 'dash' ? 'jk' : 's';
   if (s === 'b') return 'b';
-  return 'i' + (now / 420 | 0) % 2;
+  return 'i' + bl(now, 420);
 }
 
 // ---------- Enemies ----------
@@ -972,11 +986,13 @@ let near = (e) => {
   return b;
 }
 let hitP = (e, r, dm, kn) => {
+  AT = e;
   FE(P, (p) => {
     if (!p || p.st === 'o') return;
     let dx = (p.x - e.x) * e.f;
     if (dx > -10 && dx < r && ABS(p.y - e.y) < 18 + (e.boss ? 8 : 0) && p.z < 45) hurtP(p, dm, kn, e.x);
   });
+  AT = 0;
 }
 // X of a slot `gap` px in front of the target. Once inside that gap an enemy holds its x
 // (it only lines up in y), so it never backs away while a player walks in to hit it.
@@ -992,7 +1008,7 @@ let hurtE = (e, d, kn, by, quiet) => {
   e.hp -= d; e.fl = 80; e.hb = n + 1500; squ(e, e.boss ? 0.08 : 0.2);
   spark(e.x - (by ? by.f : 0) * 8, e.y - e.z - (e.t === 'dr' ? 14 : e.bx ? 20 : 50), by ? by.h.c : 0xffffff);
   // Combo: hits within 1.5 s chain; each hit scores 10 x chain (capped at 10x).
-  if (by) { by.ch = n - by.ct < 1500 ? by.ch + 1 : 1; by.ct = n; by.hk = MN(100, by.hk + 4); by.sc += 10 * MN(by.ch, 10); if (by.ch % 10 < 1) pop(by.x, by.y - 130, '¡TE FUISTE AL CHANCHO!', css(by.h.c), 20); }
+  if (by) { by.ch = n - by.ct < 1500 ? by.ch + 1 : 1; by.ct = n; by.hk = MN(100, by.hk + 4); by.sc += 10 * MN(by.ch, 10); if (by.ch % 10 < 1) pp(by, 130, '¡TE FUISTE AL CHANCHO!', hc(by), 20); }
   SFX_hit(by ? by.ch : 0);
   if (!quiet) { frz = n + (e.hp <= 0 ? 110 : kn ? 70 : 40); if (kn) shake(80, e.hp <= 0 ? 0.008 : 0.004); if (e.hp <= 0 && !e.bx) ring(e.x, e.y - e.z - 20, 60, by ? by.h.c : 0xffffff); }
   if (e.bx) { if (e.hp <= 0) { e.rm = 1; debris(e); drop(e, 1); } return; }
@@ -1003,7 +1019,7 @@ let hurtE = (e, d, kn, by, quiet) => {
   if (kn) {
     es(e, 'd'); e.vz = 6.5; e.z = MX(e.z, 0.1);
     e.kx = (by ? (e.x > by.x ? 1 : -1) : -e.f) * 4.5; e.f = e.kx > 0 ? -1 : 1;
-    if (by && e.hp <= 0 && RND() < 0.4) pop(e.x, e.y - 100, SL[RND() * SL.length | 0], css(by.h.c), 20);
+    if (by && e.hp <= 0 && RND() < 0.4) pp(e, 100, SL[rn(SL.length)], hc(by), 20);
   } else { es(e, 'h'); e.x += by && e.x > by.x ? 5 : -5; }
 }
 // The stolen tokens: they burst out of every KO, fly to nearby players and refill HACK.
@@ -1015,9 +1031,9 @@ let drop = (e, force) => {
 }
 let upE = (e, dt, now) => {
   let ms = dt * 16.67;
-  e.tm += ms; e.cd -= ms; if (e.fl > 0) e.fl -= ms;
+  e.tm += ms; e.cd -= e.rg ? ms * 1.4 : ms; if (e.fl > 0) e.fl -= ms;
   if (e.bx) return;
-  if (e.dead) { e.s.setAlpha((now / 60 | 0) % 2 ? 0.25 : 1); if (e.tm > (e.boss ? 1700 : 700)) e.rm = 1; return; }
+  if (e.dead) { e.s.setAlpha(bl(now, 60) ? 0.25 : 1); if (e.tm > (e.boss ? 1700 : 700)) e.rm = 1; return; }
   if (e.st === 'd') {
     if (e.z > 0 || e.vz > 0) {
       e.z += e.vz * dt; e.vz -= 0.5 * dt; e.x += e.kx * dt;
@@ -1052,7 +1068,7 @@ let upHum = (e, dt, tg) => {
     moveTo(e, slotX(e, tg, 44), tg.y + e.yo * 0.3, dt);
     if (e.cd <= 0 && ABS(dx) < 66 && ABS(dy) < 14) { if (free()) es(e, 'n'); else e.cd = 400; }
     else if (e.t === 'ex' && e.cd <= 0 && ABS(dy) < 14 && ABS(dx) > 170) es(e, 's');
-  } else if (e.st === 'n') { e.mv = 0; if (e.tm > 330 - st.i * 12) es(e, 'a'); }
+  } else if (e.st === 'n') { e.mv = 0; if (e.tm > (st.i ? 330 - st.i * 12 : 420)) es(e, 'a'); }
   else if (e.st === 'a') {
     if (!e.hd && e.tm > 50) { e.hd = 1; hitP(e, 62, e.dm, e.t === 'tk'); }
     if (e.tm > 260) { es(e, 'w'); e.cd = (700 + RND() * 1200) * (1 - st.i * 0.05); }
@@ -1079,12 +1095,14 @@ let upDg = (e, dt, tg) => {
   } else if (e.st === 'n') { e.mv = 0; if (e.tm > 420) es(e, 'c'); }
   else if (e.st === 'c') {
     e.x += e.f * 7.5 * dt;
-    FE(P, (p) => { if (live(p) && !e.hit.has(p) && ABS(p.x - e.x) < 34 && ABS(p.y - e.y) < 16 && p.z < 30) { e.hit.add(p); hurtP(p, e.dm, 1, e.x - e.f); } });
+    FE(P, (p) => { if (live(p) && !e.hit.has(p) && nr(p, e, 34, 16) && p.z < 30) { e.hit.add(p); hurtP(p, e.dm, 1, e.x - e.f); } });
     if (e.tm > 520) { es(e, 'w'); e.cd = 1600 + RND() * 1000; }
   }
 }
 let upBoss = (e, dt, tg) => {
   let dx = tg.x - e.x, dy = tg.y - e.y, sc = e.bs;
+  // Enraged under 30% HP: red tint, 40% faster cooldowns (see upE), 20% faster walk and one shout.
+  if (e.hp < e.mhp * 0.3 && !e.rg) { e.rg = 1; e.sp *= 1.2; pp(e, 150, '¡AHORA SÍ!', '#f44', 24); shake(300, 0.01); SFX_hu(); }
   switch (e.st) {
     case 'w':
       if (e.z > 0) e.z = MX(0, e.z - 3 * dt);
@@ -1093,7 +1111,7 @@ let upBoss = (e, dt, tg) => {
       if (e.cd <= 0) {
         let close = ABS(dx) < 80 * sc && ABS(dy) < 22, mo = e.mo.replace('p', '') || 'p';
         // Up close: punch half the time, otherwise any other move, so each boss shows its whole set.
-        let m = close && e.mo.includes('p') && RND() < 0.5 ? 'p' : mo[RND() * mo.length | 0];
+        let m = close && e.mo.includes('p') && RND() < 0.5 ? 'p' : mo[rn(mo.length)];
         es(e, { p: 'n', c: 'C', s: 's', m: 'm', t: 't', h: 'z' }[m]);
       }
       break;
@@ -1122,7 +1140,7 @@ let upBoss = (e, dt, tg) => {
       break;
     case 'm':
       e.mv = 0;
-      if (!e.hd && e.tm > 300) { e.hd = 1; if (E.filter((x) => x.t === 'dr').length < 3) { spawnE('dr', -1); spawnE('dr', 1); } pop(e.x, e.y - 200, '¡SEGURIDAD!', '#f34'); }
+      if (!e.hd && e.tm > 300) { e.hd = 1; if (E.filter((x) => x.t === 'dr').length < 3) { spawnE('dr', -1); spawnE('dr', 1); } pp(e, 200, '¡SEGURIDAD!', '#f34'); }
       if (e.tm > 650) { es(e, 'w'); e.cd = 1100; }
       break;
     case 't':
@@ -1131,7 +1149,7 @@ let upBoss = (e, dt, tg) => {
       if (e.tm < 400) e.x += cl(dx, -3, 3) * dt;
       if (!e.hd && e.tm >= 600) {
         e.hd = 1; ring(e.x, e.y + 30, 240, 0xffa040); shake(250, 0.015); SFX_boom(); dust(e.x, e.y, 7);
-        FE(P, (p) => { if (p && p.z < 8 && ABS(p.x - e.x) < 240 && ABS(p.y - e.y) < 70) hurtP(p, e.dm, 1, e.x, 1); });
+        FE(P, (p) => { if (p && p.z < 8 && nr(p, e, 240, 70)) hurtP(p, e.dm, 1, e.x, 1); });
       }
       if (e.tm > 950) { es(e, 'w'); e.cd = 900; }
       break;
@@ -1141,8 +1159,8 @@ let upBoss = (e, dt, tg) => {
 }
 let efr = (e, now) => {
   if (e.bx) return 'bx' + e.v;
-  if (e.t === 'dr') return 'dr' + (now / 50 | 0) % 2;
-  if (e.t === 'dg') return 'dg' + (e.st === 'c' || e.st === 'n' ? 2 : e.mv ? (now / 110 | 0) % 2 : 0);
+  if (e.t === 'dr') return 'dr' + bl(now, 50);
+  if (e.t === 'dg') return 'dg' + (e.st === 'c' || e.st === 'n' ? 2 : e.mv ? bl(now, 110) : 0);
   if (e.t === 'cd') return 'cd' + (now / (e.st === 'c' ? 90 : 220) | 0) % 2;
   let k = e.t + '_', s = e.st;
   if (e.dead || s === 'h' || s === 'd' || s === 'u') return k + 'h';
@@ -1151,7 +1169,7 @@ let efr = (e, now) => {
   if (s === 'c' || s === 'C') return k + 'k';
   if (s === 's' || s === 'm' || s === 'z') return k + 's';
   if (s === 't') return k + (e.z > 0 ? 'j' : 'i0');
-  return k + (e.mv ? 'w' + (now / 140 | 0) % 4 : 'i' + (now / 420 | 0) % 2);
+  return k + (e.mv ? 'w' + (now / 140 | 0) % 4 : 'i' + bl(now, 420));
 }
 let drawE = (e, fr, pl) => {
   let s = e.s;
@@ -1162,13 +1180,14 @@ let drawE = (e, fr, pl) => {
   // Knocked bodies tumble back 35° in flight, then lie flat from the first landing on.
   s.angle = e.st === 'd' && !e.boss ? (e.f > 0 ? -1 : 1) * (e.z <= 0 || e.ld ? 90 : 35) : 0;
   if (e.fl > 0) { if (pl) s.setTint(0xff6060); else s.setTintFill(0xffffff); }
+  else if (e.rg) s.setTint(0xff7070);
   else s.clearTint();
   if (e.sd) e.sd.setPosition(e.x, e.y).setScale(1 - MN(e.z, 200) / 300);
 }
 
 // ---------- Bosses ----------
 let spawnBoss = () => {
-  let b = st.d.b, n = P.filter((p) => live(p)).length;
+  let b = st.d.b, n = P.filter(live).length;
   let e = spawnE(b[1], 1);
   Object.assign(e, { boss: 1, nm: b[0], mo: b[4], hp: b[3] * (n > 1 ? 1.5 : 1), sc: 3000, dm: 14 + st.i * 2, sp: 1.7, w: 30, cd: 1500 });
   e.mhp = e.hp; e.bs = b[2];
@@ -1192,7 +1211,7 @@ function bossDie(e) {
 
 // ---------- Projectiles, allies, items ----------
 let proj = (x, y, z, vx, o, dm, kn, w, h, col) => {
-  let p = { x, y, z, vx, o, dm, kn, w, life: 2500, hit: new Set(), s: AD.rectangle(x, y - z, w * 2, h, col, o === 'p' ? 0.55 : 1).setOrigin(0.5, 1) };
+  let p = { x, y, z, vx, o, dm, kn, w, life: 2500, hit: new Set(), s: RC(x, y - z, w * 2, h, col, o === 'p' ? 0.55 : 1).setOrigin(0.5, 1) };
   if (o === 'p') p.s.setStrokeStyle(3, 0xe0c8ff);
   PR.push(p);
   return p;
@@ -1209,10 +1228,11 @@ let upPR = (o, dt) => {
     o.s.setAlpha(0.35 + RND() * 0.4);
   }
 }
-// Nearest standing foe within r of o (the drone ally and the demo bot).
+// Nearest foe still standing within r of o (the drone ally and the demo bot). KO'd foes (hp <= 0) are
+// skipped: zapping one relaunched the body before it landed, so it never died and the drone fired forever.
 let nearE = (o, r) => {
   let b = null, bd = r;
-  FE(E, (e) => { if (!e.dead && !e.bx) { let d = HYP(e.x - o.x, e.y - o.y); if (d < bd) { bd = d; b = e; } } });
+  FE(E, (e) => { if (e.hp > 0 && !e.bx) { let d = HYP(e.x - o.x, e.y - o.y); if (d < bd) { bd = d; b = e; } } });
   return b;
 }
 let upAL = (a, dt, now) => {
@@ -1221,28 +1241,30 @@ let upAL = (a, dt, now) => {
   a.x += (o.x - o.f * 34 - a.x) * 0.1 * dt; a.y += (o.y - 4 - a.y) * 0.1 * dt; a.z = 80 + SIN(now / 150) * 6;
   if (a.cd <= 0) {
     let b = nearE(a, 300);
-    if (b) { zap(a.x, a.y - a.z, b.x, b.y - b.z - 40, 0xffa040); hurtE(b, 9, 0, o, 1); a.cd = 450; }
+    // No attacker: drone zaps must not refill PUERTO's HACK or combo, or one drone pays for the next forever.
+    if (b) { zap(a.x, a.y - a.z, b.x, b.y - b.z - 40, 0xffa040); hurtE(b, 9, 0, 0, 1); a.cd = 450; }
   }
-  a.s.setTexture('dr' + (now / 50 | 0) % 2).setPosition(a.x, a.y - a.z).setDepth(a.y);
+  a.s.setTexture('dr' + bl(now, 50)).setPosition(a.x, a.y - a.z).setDepth(a.y);
 }
 let upIT = (i, dt, now) => {
   i.t += dt * 16.67;
   // Tokens fly to a live player within ~110 px.
   if (i.k > 3) { let p = P.find((q) => live(q) && ABS(q.x - i.x) + ABS(q.y - i.y) < 110); if (p) { i.x += (p.x - i.x) * 0.15 * dt; i.y += (p.y - i.y) * 0.15 * dt; } }
   i.s.setPosition(i.x, i.y - 4 - ABS(SIN(now / 200)) * 6).setDepth(i.y);
-  if (i.t > 9000) i.s.setVisible((now / 80 | 0) % 2 === 0);
+  if (i.t > 9000) i.s.setVisible(bl(now, 80) === 0);
   if (i.t > 12000) i.rm = 1;
   for (let p of P) {
-    if (live(p) && p.st !== 'd' && ABS(p.x - i.x) < 32 && ABS(p.y - i.y) < 20 && p.z < 20) { take(p, i.k); i.rm = 1; break; }
+    if (live(p) && p.st !== 'd' && nr(p, i, 32, 20) && p.z < 20) { take(p, i.k); i.rm = 1; break; }
   }
 }
 let take = (p, k) => {
-  if (k > 3) { p.sc += 50; p.hk = MN(100, p.hk + 4); st.tk[p.pi]++; SFX_tk(); return; }
+  // Token streak: pickups less than 1.2 s apart chain; every 5 in a row raise the multiplier (x2..x5).
+  if (k > 3) { let n = tn(), mu; st.rs = n < st.rt ? st.rs + 1 : 1; st.rt = n + 1200; mu = MN(5, 1 + (st.rs / 5 | 0)); p.sc += 50 * mu; p.hk = MN(100, p.hk + 4); st.tk[p.pi]++; if (mu > 1 && st.rs % 5 < 1) pp(p, 120, '¡RACHA x' + mu + '!', YL, 20); SFX_tk(); return; }
   if (k === 0) p.hp = MN(100, p.hp + 35);
   if (k === 1) p.hk = 100;
   if (k === 2) { p.sc += 500; p.hk = MN(100, p.hk + 20); }
   if (k === 3) p.hp = 100;
-  pop(p.x, p.y - 110, ITEMS[k][0], ITEMS[k][1], 18);
+  pp(p, 110, ITEMS[k][0], ITEMS[k][1], 18);
   SFX_pk();
 }
 let cull = () => {
@@ -1268,21 +1290,21 @@ let sep = (dt) => {
 let wave = (i, k, n) => {
   let pool = STG[i].pool.split(','), q = [];
   // Waves grow every other stage so the 6-stage run stays near arcade length (~7 min).
-  rp(3 + (i >> 1) + k + (n > 1 ? 2 : 0), (j) => { q.push(pool[RND() * pool.length | 0]); });
+  rp(3 + (i >> 1) + k + (n > 1 ? 2 : 0), (j) => { q.push(pool[rn(pool.length)]); });
   return q;
 }
 let stage = (i) => {
-  clearAll(); clearWorld(); MODE = 'p'; CM.setScroll(0, 0);
+  scr('p');
   let d = STG[i], n = P.filter(Boolean).length;
   // Two waves, then the boss: keeps a full 6-stage clear near arcade length.
-  st = { i, d, len: 2800, wv: [650, 1450].map((x, k) => ({ x, q: wave(i, k, n) })), wi: 0, act: 0, q: [], sp: 0, lim: 650, tk: [0, 0] };
+  st = { i, d, len: 2800, wv: [650, 1450].map((x, k) => ({ x, q: wave(i, k, n) })), wi: 0, act: 0, q: [], sp: 0, lim: 650, tk: [0, 0], dm: 0, rs: 0, rt: 0 };
   L = bgSet(i);
   // Street lamps in the foreground (faster parallax) on the city stages; rain in Providencia.
   if (i < 3) L.p = TL(0, 0, W, H, 'fg', 900).setAlpha(0.92);
   if (i === 1) L.r = TL(0, 0, W, H, 'rn', 950);
   // Wind streaks: the rain texture turned sideways, shown only during gusts.
   if (i === 4) L.w = ui(AD.tileSprite(W / 2, H / 2, 1100, 1100, 'rn').setAngle(82).setAlpha(0), 950);
-  if (!i) fo(ut(W / 2, 548, HELP, 13, 4001, YL), 800, 7000, 0);
+  if (!i) fo(uc(548, HELP, 13, 4001, YL), 800, 7000, 0);
   // The Platanus billboard hangs on city buildings only (a rooftop in Providencia); outdoors it would float.
   if (i < 2) WO.push(AD.image(560, i ? 138 : 106, 'pb').setOrigin(0.5, 0).setDepth(5));
   FE(d.sg, ([, , x], k) => WO.push(AD.image(x, 430, 'sg' + i + k).setOrigin(0.5, 1).setDepth(6)));
@@ -1307,7 +1329,7 @@ let temblor = () => {
 // A red mark warns for 0.9 s, then a container/meteor lands (or a laser sweeps the lane) and hits players
 // (unblockable; jump over lasers) and grunts alike.
 let hzd = (x, y, lane) => {
-  let m = (lane ? AD.rectangle(camX() + W / 2, y, W, 8, 0xff2a40, 0.6) : AD.ellipse(x, y, 96, 28, 0xff2a40, 0.45)).setDepth(391);
+  let m = (lane ? RC(camX() + W / 2, y, W, 8, 0xff2a40, 0.6) : AD.ellipse(x, y, 96, 28, 0xff2a40, 0.45)).setDepth(391);
   tw(m, { alpha: 0.25, yoyo: true, repeat: 2, duration: 150 });
   if (!lane) {
     let b = AD.image(x, y - 420, st.i === 3 ? 'sp' : 'bx1').setScale(2.4).setOrigin(0.5, 1).setDepth(y).setTint(st.i === 3 ? 0xff7a30 : 0xffffff);
@@ -1317,7 +1339,7 @@ let hzd = (x, y, lane) => {
     m.destroy();
     if (MODE !== 'p' || st.end) return;
     let hit = (o) => o.z < 30 && ABS(o.y - y) < (lane ? 16 : 22) && (lane || ABS(o.x - x) < 52);
-    if (lane) { fo(AD.rectangle(camX() + W / 2, y - 40, W, 12, 0xff3050).setDepth(1990), 350); SFX_zap(); } else boom(x, y - 20);
+    if (lane) { fo(RC(camX() + W / 2, y - 40, W, 12, 0xff3050).setDepth(1990), 350); SFX_zap(); } else boom(x, y - 20);
     shake(150, 0.006);
     FE(P, (p) => { if (live(p) && hit(p)) hurtP(p, 16, 1, x, 1); });
     FE(E, (e) => { if (!e.boss && !e.bx && !e.dead && hit(e)) hurtE(e, 30, 1); });
@@ -1325,11 +1347,11 @@ let hzd = (x, y, lane) => {
 };
 // Patagonian wind: 2.5 s gusts push everyone sideways (bosses less).
 let gust = () => { st.wd = RND() < 0.5 ? -2.2 : 2.2; st.wt = tn() + 2500; pop(camX() + W / 2, 250, '¡VIENTO PATAGÓNICO!', '#cef', 22); };
-let tgt = () => { let a = P.filter((p) => live(p) && p.s); return a[RND() * a.length | 0]; };
+let tgt = () => { let a = P.filter((p) => live(p) && p.s); return a[rn(a.length)]; };
 // Santiago teaches the basics; Providencia's wet floor is passive (see upP); then containers, meteors, wind, lasers.
 let HZ = [0, 0, (p) => hzd(p.x, p.y), (p) => FE([-1, 0, 1], (k) => hzd(p.x + k * 110, p.y + k * 30)), gust, (p) => hzd(0, p.y, 1)];
 let upCam = (dt, now) => {
-  let al = P.filter((p) => live(p));
+  let al = P.filter(live);
   let lim = st.wi < st.wv.length ? st.wv[st.wi].x : st.len - W;
   st.lim = lim;
   let c = camX();
@@ -1378,25 +1400,40 @@ let renderAll = (now) => {
   FE(P, (p) => {
     if (!p || p.st === 'o' || !p.s) return;
     drawE(p, p.k + '_' + pfr(p, now), 1);
-    p.s.setVisible(!(p.inv > 0 && p.st !== 'd' && (now / 70 | 0) % 2));
+    p.s.setVisible(!(p.inv > 0 && p.st !== 'd' && bl(now, 70)));
   });
   FE(E, (e) => drawE(e, efr(e, now)));
 }
 let clearStage = () => {
   if (MODE !== 'p') return;
-  st.end = 1; playSong(null); SFX_cl();
-  FE(P, (p) => { if (live(p)) p.sc += 1000 + (p.hp * 20 | 0); });
-  banner(['¡BACÁN, CABROS!', '¡TOKENS RECUPERADOS!', 'ETAPA ' + (st.i + 1) + ' · BONO 1000 + VIDA x20'], 3000);
+  st.end = 1; playSong(null); SFX_cl(); TK += st.tk[0] + st.tk[1];
+  // Stage rank from damage taken per living player: S < 30, A < 80, B < 160, else C. Bonus 3000 >> rank.
+  let dm = st.dm / MX(1, P.filter(live).length), rk = dm < 30 ? 0 : dm < 80 ? 1 : dm < 160 ? 2 : 3, bo = 3000 >> rk;
+  FE(P, (p) => { if (live(p)) p.sc += 1000 + (p.hp * 20 | 0) + bo; });
+  banner(['¡BACÁN! TOKENS RECUPERADOS', 'RANGO ' + 'SABC'[rk], 'BONO ' + (1000 + bo) + ' + VIDA x20'], 3000);
   // Each player's tokens from this stage count up under the banner, one rising tick per step.
   FE(P, (p, k) => {
     if (!live(p)) return;
-    let t = ut(W / 2, 362 + k * 32, '', 20, 4001, css(p.h.c));
+    let t = uc(362 + k * 32, '', 20, 4001, hc(p));
     rp(21, (s) => later(600 + s * 60, () => { t.setText(p.h.n + ': ' + (st.tk[k] * s / 20 | 0) + ' TOKENS'); tone(600 + s * 40, 0.05, SQ, 0.04); }));
   });
   later(4000, () => {
     if (MODE !== 'p') return;
-    if (st.i < STG.length - 1) { FE(P, (p) => { if (p) p.hp = 100; }); stage(st.i + 1); } else win();
+    if (st.i < STG.length - 1) { FE(P, (p) => { if (p) p.hp = 100; }); st.i > 3 ? finale() : stage(st.i + 1); } else win();
   });
+}
+// Before the last stage: an elevator ride up the Costanera, so players know the final level is next.
+let finale = () => {
+  scr('e');
+  // Only the night city far below shows during the ride (no office yet).
+  L = bgSet(5); L.m.setVisible(false); dim(0.5);
+  uc(190, '¡ETAPA FINAL!', 52, 10, PK);
+  uc(250, 'Condor Corp guarda los tokens en el piso 62', 16);
+  let t = uc(330, '', 40, 10, YL);
+  rp(32, (s) => later(s * 80, () => { t.setText('PISO ' + MX(1, s * 2)); tone(200 + s * 30, 0.06, SQ, 0.05); }));
+  later(2700, () => { CM.flash(400, 255, 40, 60); SFX_zap(); });
+  // Not skippable: the next stage starts after 3.6 s.
+  G.wt = G.w0 = tn() + 3600; G.next = () => stage(5);
 }
 
 // ---------- HUD ----------
@@ -1417,11 +1454,11 @@ function mkHud() {
   });
   // Continue countdown, shown only while every player is out.
   HUD.cd = dim(0.55, 5002);
-  HUD.ct = ut(W / 2, 270, '', 56, 5003, YL);
-  HUD.cs = ut(W / 2, 330, 'PRESIONA START PARA SEGUIR', 18, 5003);
+  HUD.ct = uc(270, '', 56, 5003, YL);
+  HUD.cs = uc(330, 'PRESIONA START PARA SEGUIR', 18, 5003);
   ui(AD.image(W / 2, 34, 'plat').setScale(0.4), 5001);
-  ut(W / 2, 74, 'ETAPA ' + (st.i + 1), 12, 5001, PL);
-  HUD.bn = ut(W / 2, 562, '', 14, 5002, WH);
+  uc(74, 'ETAPA ' + (st.i + 1), 12, 5001, PL);
+  HUD.bn = uc(562, '', 14, 5002, WH);
   HUD.go = ut(W - 90, 300, '¡SIGUE! ▶', 24, 5001, YL);
 }
 let drawHud = (now) => {
@@ -1430,23 +1467,23 @@ let drawHud = (now) => {
   rp(2, (pi) => {
     let h = HUD.s[pi], p = P[pi], x = h.x, on = live(p), col = p ? p.h.c : 0x555566;
     g.fillStyle(0x0c0816, 0.85).fillRect(x, 6, 290, 60);
-    g.lineStyle(3, on && p.hp < 30 && (now / 200 | 0) % 2 ? 0xff3040 : col).strokeRect(x, 6, 290, 60);
+    g.lineStyle(3, on && p.hp < 30 && bl(now, 200) ? 0xff3040 : col).strokeRect(x, 6, 290, 60);
     // Text colors change only with the hero (setColor re-renders the text, so never per frame).
-    if (p && h.k !== p.hi) { h.k = p.hi; h.im.setTexture('h' + p.hi + '_i0').setCrop(18, 3, 33, 33).setPosition(x + 8 - 18, 16 - 3); h.n.setColor(css(p.h.c)); h.cb.setColor(css(p.h.c)); }
+    if (p && h.k !== p.hi) { h.k = p.hi; h.im.setTexture('h' + p.hi + '_i0').setCrop(18, 3, 33, 33).setPosition(x + 8 - 18, 16 - 3); h.n.setColor(hc(p)); h.cb.setColor(hc(p)); }
     h.im.setVisible(!!on); h.n.setVisible(!!on); h.l.setVisible(!!on); h.sc.setVisible(!!p); h.tq.setVisible(!!p); h.m.setVisible(!on);
     // Combo counter pops on each hit and fades out as the chain window closes.
     let ca = on && p.ch > 1 ? 1500 - now + p.ct : 0;
     h.cb.setVisible(ca > 0);
     if (ca > 0) h.cb.setText(p.ch + ' HITS!').setScale(1 + MX(0, ca - 1340) / 300).setAlpha(MN(1, ca / 300));
     if (on) {
-      h.n.setText(p.h.n); h.l.setText('x' + p.lives); h.sc.setText(String(p.sc).padStart(7, '0'));
+      h.n.setText(p.h.n); h.l.setText('x' + p.lives); h.sc.setText(Z7(p.sc));
       for (let k = 0; k < 20; k++) g.fillStyle(k < p.hp / 5 ? (p.hp > 30 ? 0x5cff6a : 0xff4a4a) : 0x2a2838).fillRect(x + 52 + k * 11, 36, 9, 10);
       g.fillStyle(0x1a1a2a).fillRect(x + 52, 52, 218, 7);
-      g.fillStyle(p.hk >= 50 && (now / 150 | 0) % 2 ? 0xffffff : 0x40e0ff).fillRect(x + 52, 52, 218 * p.hk / 100, 7);
+      g.fillStyle(p.hk >= 50 && bl(now, 150) ? 0xffffff : 0x40e0ff).fillRect(x + 52, 52, 218 * p.hk / 100, 7);
       g.fillStyle(0xffe14a).fillRect(x + 160, 50, 2, 11);
     } else {
-      h.m.setText(p ? 'CONTINUAR? START' : 'P' + (pi + 1) + ' · PRESIONA START').setAlpha((now / 400 | 0) % 2 ? 1 : 0.35);
-      if (p) h.sc.setText(String(p.sc).padStart(7, '0'));
+      h.m.setText(p ? 'CONTINUAR? START' : 'P' + (pi + 1) + ' · PRESIONA START').setAlpha(bl(now, 400) ? 1 : 0.35);
+      if (p) h.sc.setText(Z7(p.sc));
     }
   });
   let b = st.boss;
@@ -1463,7 +1500,7 @@ let drawHud = (now) => {
       g.fillStyle(0x120a1a).fillRect(x - 2, y - 2, 44, 8).fillStyle(0xff3040).fillRect(x, y, 40 * MX(0, e.hp) / e.mhp, 4);
     }
   });
-  HUD.go.setVisible(!st.act && !st.end && st.gt > now && camX() < st.lim - 5 && (now / 300 | 0) % 2 === 0);
+  HUD.go.setVisible(!st.act && !st.end && st.gt > now && camX() < st.lim - 5 && bl(now, 300) === 0);
   // Continue overlay: only while the countdown runs, and never over the stage-clear banner.
   FE([HUD.cd, HUD.ct, HUD.cs], (o) => o.setVisible(st.go > now && !st.end));
 }
@@ -1472,21 +1509,22 @@ let drawHud = (now) => {
 function gameOver() {
   MODE = 'o'; playSong(null); SFX_ov();
   dim(0.6, 6000, 0);
-  ut(W / 2, 250, '¡CHUTA!', 64, 6001, PK);
-  ut(W / 2, 320, 'GAME OVER', 36, 6001);
-  ut(W / 2, 370, 'Condor Corp se queda con los tokens... por ahora.', 16, 6001, '#ccc');
+  uc(250, '¡CHUTA!', 64, 6001, PK);
+  uc(320, 'GAME OVER', 36, 6001);
+  uc(370, 'Condor Corp se queda con los tokens... por ahora.', 16, 6001, '#ccc');
   later(3500, names);
 }
 function win() {
-  clearAll(); clearWorld(); MODE = 'e'; CM.setScroll(0, 0);
+  scr('e');
   FE(P, (p) => { if (live(p)) FIN.push({ s: p.sc, h: p.hi, pi: p.pi }); });
   L = bgSet(5);
   dim(0.45);
-  ut(W / 2, 120, '¡RECUPERAMOS LOS TOKENS!', 40, 10, YL);
-  ut(W / 2, 175, 'Los tokens vuelven a ser de todos. ¡CHI CHI CHI, LE LE LE!', 16);
+  uc(120, '¡RECUPERAMOS LOS TOKENS!', 40, 10, YL);
+  uc(215, 'TOKENS RECUPERADOS: ' + TK, 20, 10, YL);
+  uc(175, 'Los tokens vuelven a ser de todos. ¡CHI CHI CHI, LE LE LE!', 16);
   FE(HER, (h, i) => ui(hum(220 + i * 120, 420, 'h' + i + '_s').setScale(1.3), 10));
   ui(AD.image(W / 2, 500, 'plat').setScale(0.5), 10);
-  ut(W / 2, 555, 'GRACIAS POR JUGAR · PLATANUS HACK 26 · SANTIAGO', 14, 10, PL);
+  uc(555, 'GRACIAS POR JUGAR · PLATANUS HACK 26 · SANTIAGO', 14, 10, PL);
   playSong(SONG.t); SFX_cl();
   G.wt = tn() + 8000; G.w0 = tn(); G.next = names;
 }
@@ -1503,17 +1541,17 @@ let AB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 let nextName = () => {
   while (G.ni < G.nq.length && !qualifies(G.nq[G.ni].s)) G.ni++;
   if (G.ni >= G.nq.length) { showBoard(); return; }
-  clearAll(); clearWorld(); MODE = 'n';
+  scr('n');
   duskBg(); dim(0.55);
   let f = G.nq[G.ni];
   G.nm = { f, l: [0, 0, 0], c: 0, rp: 0, t0: tn() };
-  ut(W / 2, 110, '¡NUEVO RÉCORD!', 40, 10, YL);
-  ut(W / 2, 170, 'JUGADOR ' + (f.pi + 1) + ' · ' + HER[f.h].n, 20, 10, css(HER[f.h].c));
-  ut(W / 2, 210, String(f.s).padStart(7, '0'), 28);
+  uc(110, '¡NUEVO RÉCORD!', 40, 10, YL);
+  uc(170, 'JUGADOR ' + (f.pi + 1) + ' · ' + HER[f.h].n, 20, 10, css(HER[f.h].c));
+  uc(210, Z7(f.s), 28);
   ui(hum(140, 400, 'h' + f.h + '_s').setScale(1.6), 10);
   G.lt = [0, 1, 2].map((k) => ut(330 + k * 70, 320, 'A', 56));
-  G.cur = ui(AD.rectangle(330, 360, 50, 6, 0xffe14a), 10);
-  ut(W / 2, 440, 'ARRIBA/ABAJO: LETRA · B1: SIGUIENTE · START: LISTO', 13, 10, '#aaa');
+  G.cur = ui(RC(330, 360, 50, 6, 0xffe14a), 10);
+  uc(440, 'ARRIBA/ABAJO: LETRA · B1: SIGUIENTE · START: LISTO', 13, 10, '#aaa');
   logoBadge(W / 2, 520, 0.36);
 }
 let upName = (dt, now) => {
@@ -1522,7 +1560,6 @@ let upName = (dt, now) => {
   if (now < n.t0 + 600) return;
   let step = 0;
   if (tap(pre + 'U') || tap(pre + 'D')) { step = u ? 1 : -1; n.rp = now + 320; }
-  else if ((u || d) && now > n.rp) { step = u ? 1 : -1; n.rp = now + 90; }
   if (step) { n.l[n.c] = (n.l[n.c] + step + AB.length) % AB.length; SFX_sel(); }
   if (tap(pre + 'L')) n.c = MX(0, n.c - 1);
   if (tap(pre + 'R')) n.c = MN(2, n.c + 1);
@@ -1537,17 +1574,17 @@ let upName = (dt, now) => {
   }
 }
 function showBoard() {
-  clearAll(); clearWorld(); MODE = 'e'; CM.setScroll(0, 0);
+  scr('e');
   L = bgSet(3);
   dim(0.55);
-  ut(W / 2, 80, 'RÉCORDS DE TOKENS', 44, 10, YL);
+  uc(80, 'RÉCORDS DE TOKENS', 44, 10, YL);
   FE(board, (e, i) => {
     ut(220, 150 + i * 42, i + 1 + '.', 24, 10, '#aaa', 0);
     ut(280, 150 + i * 42, e.n, 24, 10, css(HER[e.h].c), 0);
     ut(400, 150 + i * 42, HER[e.h].n, 16, 10, '#889', 0);
-    ut(590, 150 + i * 42, String(e.s).padStart(7, '0'), 24, 10, WH, 1);
+    ut(590, 150 + i * 42, Z7(e.s), 24, 10, WH, 1);
   });
-  if (!board.length) ut(W / 2, 250, 'SIN RÉCORDS AÚN', 24);
+  if (!board.length) uc(250, 'SIN RÉCORDS AÚN', 24);
   logoBadge(W / 2, 520, 0.36);
   playSong(SONG.t);
   G.wt = tn() + 9000; G.w0 = tn(); G.next = title;
