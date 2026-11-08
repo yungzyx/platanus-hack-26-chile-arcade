@@ -34,108 +34,110 @@ const CABINET_KEYS = {
 };
 
 // Everything below lives in one function scope so the minifier can shorten every name.
+// Declarations use let, not const, on purpose: the arcade server's minifier keeps const as written,
+// so let saves two bytes per declaration (the local swc check converts it either way).
 (() => {
-const { abs: ABS, random: RND, min: MN, max: MX, sin: SIN, cos: COS, hypot: HYP, PI } = Math;
+let { abs: ABS, random: RND, min: MN, max: MX, sin: SIN, cos: COS, hypot: HYP, PI } = Math;
 // Shared palette and the square-wave type.
-const YL = '#fd4', WH = '#fff', CY = '#4df', PK = '#ff3ca6', PL = '#f6b919', DK = '#120a1a', SQ = 'square';
+let YL = '#fd4', WH = '#fff', CY = '#4df', PK = '#ff3ca6', PL = '#f6b919', DK = '#120a1a', SQ = 'square';
 // a.forEach(f) in fewer bytes (the minifier keeps the call short).
-const FE = (a, f) => a.forEach(f);
+let FE = (a, f) => a.forEach(f);
 // Run f(i) for i = 0..n-1.
-const rp = (n, f) => { for (let i = 0; i < n; i++) f(i); };
+let rp = (n, f) => { for (let i = 0; i < n; i++) f(i); };
 // Canvas fill / stroke colour setters (shorter than the property assignments).
-const FS = (c, v) => { c.fillStyle = v; }, SS = (c, v) => { c.strokeStyle = v; };
+let FS = (c, v) => { c.fillStyle = v; }, SS = (c, v) => { c.strokeStyle = v; };
 // Canvas fill shorthand for the procedural art (col 0 keeps the current fill colour).
-const FR = (c, col, x, y, w, h) => { if (col) FS(c, col); c.fillRect(x, y, w, h); };
+let FR = (c, col, x, y, w, h) => { if (col) FS(c, col); c.fillRect(x, y, w, h); };
 // Canvas line width setter.
-const LW = (c, w) => { c.lineWidth = w; };
+let LW = (c, w) => { c.lineWidth = w; };
 // Stroked line segment in the current stroke style.
-const LN = (c, x1, y1, x2, y2) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); };
+let LN = (c, x1, y1, x2, y2) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); };
 // Filled circle (rx only) or ellipse in the current fill style.
-const DOT = (c, x, y, rx, ry = rx, rot = 0) => { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, 7); c.fill(); };
+let DOT = (c, x, y, rx, ry = rx, rot = 0) => { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, 7); c.fill(); };
 // ---------- Input (arcade codes only) ----------
-const KM = {};
-for (const [c, ks] of Object.entries(CABINET_KEYS)) for (const k of ks) KM[k.length === 1 ? k.toLowerCase() : k] = c;
-const held = Object.create(null);
+let KM = {};
+for (let [c, ks] of Object.entries(CABINET_KEYS)) for (let k of ks) KM[k.length === 1 ? k.toLowerCase() : k] = c;
+let held = Object.create(null);
 let was = {};
-const keyCode = (e) => e.key && KM[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+let keyCode = (e) => e.key && KM[e.key.length === 1 ? e.key.toLowerCase() : e.key];
 addEventListener('keydown', (e) => {
-  const c = keyCode(e);
+  let c = keyCode(e);
   if (c) { held[c] = true; e.preventDefault(); KY = 1; }
   if (AC && AC.state !== 'running') AC.resume().catch(() => {});
 });
-addEventListener('keyup', (e) => { const c = keyCode(e); if (c) held[c] = false; });
-addEventListener('blur', () => { for (const k in held) held[k] = false; });
-const tap = (c) => held[c] && !was[c];
+addEventListener('keyup', (e) => { let c = keyCode(e); if (c) held[c] = false; });
+addEventListener('blur', () => { for (let k in held) held[k] = false; });
+let tap = (c) => held[c] && !was[c];
 // Buttons 1-3 (top row) and 4-6 (bottom row) do the same thing.
-const btn = (pre, n) => tap(pre + n) || tap(pre + (n + 3));
+let btn = (pre, n) => tap(pre + n) || tap(pre + (n + 3));
 
 // ---------- Storage (arcade bridge, local fallback) ----------
-const SKEY = 'hmc-records-v1';
+let SKEY = 'hmc-records-v1';
 let board = [];
-const store = () => window.platanusArcadeStorage || {
-  async get(k) { try { const r = localStorage.getItem(k); return r === null ? { found: false } : { found: true, value: JSON.parse(r) }; } catch (e) { return { found: false }; } },
+let store = () => window.platanusArcadeStorage || {
+  async get(k) { try { let r = localStorage.getItem(k); return r === null ? { found: false } : { found: true, value: JSON.parse(r) }; } catch (e) { return { found: false }; } },
   async set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
 };
-const loadBoard = async () => {
+let loadBoard = async () => {
   try {
-    const r = await store().get(SKEY);
+    let r = await store().get(SKEY);
     if (r && r.found && Array.isArray(r.value)) {
       board = r.value.filter((e) => e && typeof e.n === 'string' && Number.isFinite(e.s) && e.s >= 0)
         .map((e) => ({ n: e.n.slice(0, 3), s: Math.floor(MN(e.s, 1e9)), h: ((e.h | 0) % 4 + 4) % 4 })).sort((a, b) => b.s - a.s).slice(0, 8);
     }
   } catch (e) { board = []; }
 }
-const saveBoard = async () => { try { await store().set(SKEY, board); } catch (e) { /* keep playing */ } }
+let saveBoard = async () => { try { await store().set(SKEY, board); } catch (e) { /* keep playing */ } }
 
 // ---------- Audio: synthesized SFX and chiptune ----------
 let AC = null, MG = null, NB = null;
-const mf = (m) => 440 * 2 ** ((m - 69) / 12);
-const tone = (f, d, ty = SQ, v = 0.08, dl = 0, f2 = 0) => {
+let mf = (m) => 440 * 2 ** ((m - 69) / 12);
+let tone = (f, d, ty = SQ, v = 0.08, dl = 0, f2 = 0) => {
   if (!AC || AC.state !== 'running') return;
-  const t = AC.currentTime + MX(0, dl), o = AC.createOscillator(), g = AC.createGain();
+  let t = AC.currentTime + MX(0, dl), o = AC.createOscillator(), g = AC.createGain();
   o.type = ty; o.frequency.setValueAtTime(f, t);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
   g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
   o.connect(g); g.connect(MG); o.start(t); o.stop(t + d + 0.02);
 }
-const noise = (d, v = 0.1, dl = 0, hp = 800) => {
+let noise = (d, v = 0.1, dl = 0, hp = 800) => {
   if (!AC || AC.state !== 'running') return;
-  if (!NB) { NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const a = NB.getChannelData(0); rp(a.length, (i) => { a[i] = RND() * 2 - 1; }); }
-  const t = AC.currentTime + MX(0, dl), s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  if (!NB) { NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); let a = NB.getChannelData(0); rp(a.length, (i) => { a[i] = RND() * 2 - 1; }); }
+  let t = AC.currentTime + MX(0, dl), s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
   s.buffer = NB; f.type = 'highpass'; f.frequency.value = hp;
   g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
   s.connect(f); f.connect(g); g.connect(MG); s.start(t); s.stop(t + d);
 }
-const arp = (base, ns, gap, ty = SQ) => FE(ns, (n, i) => tone(mf(base + n), 0.16, ty, 0.07, i * gap));
+let arp = (base, ns, gap, ty = SQ) => FE(ns, (n, i) => tone(mf(base + n), 0.16, ty, 0.07, i * gap));
 // Pitch climbs with the combo count so long chains sound like they build.
-const SFX_hit = (k = 0) => { noise(0.09, 0.28, 0, 1200); tone(180 + MN(k, 12) * 22, 0.1, SQ, 0.1, 0, 60); };
-const SFX_sw = () => noise(0.07, 0.06, 0, 3000);
-const SFX_jp = () => tone(300, 0.15, SQ, 0.06, 0, 700);
-const SFX_hu = () => tone(220, 0.22, 'sawtooth', 0.12, 0, 70);
-const SFX_zap = () => { tone(900, 0.35, 'sawtooth', 0.08, 0, 120); tone(1400, 0.3, SQ, 0.05, 0.05, 300); };
-const SFX_pk = () => arp(72, [0, 4, 7, 12], 0.06);
-const SFX_boom = () => { noise(0.45, 0.35, 0, 150); tone(90, 0.45, 'sine', 0.3, 0, 30); };
-const SFX_thud = () => tone(90, 0.12, 'sine', 0.25, 0, 40);
-const SFX_bz = () => tone(110, 0.15, SQ, 0.08);
-const SFX_tk = () => tone(1800, 0.06, SQ, 0.05, 0, 2600);
-const SFX_blk = () => tone(1300, 0.08, SQ, 0.08, 0, 500);
-const SFX_sel = () => tone(660, 0.06, SQ, 0.06);
-const SFX_cl = () => arp(64, [0, 4, 7, 12, 16, 19, 24], 0.09);
-const SFX_ov = () => arp(60, [12, 7, 3, 0, -5], 0.2, 'triangle');
+let SFX_hit = (k = 0) => { noise(0.09, 0.28, 0, 1200); tone(180 + MN(k, 12) * 22, 0.1, SQ, 0.1, 0, 60); };
+let SFX_sw = () => noise(0.07, 0.06, 0, 3000);
+let SFX_jp = () => tone(300, 0.15, SQ, 0.06, 0, 700);
+let SFX_hu = () => tone(220, 0.22, 'sawtooth', 0.12, 0, 70);
+let SFX_zap = () => { tone(900, 0.35, 'sawtooth', 0.08, 0, 120); tone(1400, 0.3, SQ, 0.05, 0.05, 300); };
+let SFX_pk = () => arp(72, [0, 4, 7, 12], 0.06);
+let SFX_boom = () => { noise(0.45, 0.35, 0, 150); tone(90, 0.45, 'sine', 0.3, 0, 30); };
+let SFX_thud = () => tone(90, 0.12, 'sine', 0.25, 0, 40);
+let SFX_bz = () => tone(110, 0.15, SQ, 0.08);
+let SFX_tk = () => tone(1800, 0.06, SQ, 0.05, 0, 2600);
+let SFX_blk = () => tone(1300, 0.08, SQ, 0.08, 0, 500);
+let SFX_sel = () => tone(660, 0.06, SQ, 0.06);
+let SFX_cl = () => arp(64, [0, 4, 7, 12, 16, 19, 24], 0.09);
+let SFX_ov = () => arp(60, [12, 7, 3, 0, -5], 0.2, 'triangle');
 // Patterns: letters are semitones above the root (a = 0), '.' is a rest.
-const SONG = {
+let SONG = {
   t: { bpm: 112, r: 50, b: 'a..a..m.i..i..k.f..f..h.h..h..k.', l: 'm...o.p.o...m.k.m...k.h.k...h.f.' },
   g: { bpm: 140, r: 45, b: 'a.aa.am.a.aa.ak.f.ff.fm.h.hh.hk.', l: 'h.k.m.k.h.k.o.m.p.o.m.k.m.k.h.f.h.k.m.k.o.p.r.p.o.m.k.m.k.h.f.h.' },
   b: { bpm: 158, r: 40, b: 'aaamaaakaaamaaab', l: 'm.l.m.o.p.o.m.l.m.l.m.o.r.p.o.m.' },
 };
 let mus = null, mStep = 0, mNext = 0;
-const playSong = (s) => { mus = s; mStep = 0; mNext = AC ? AC.currentTime + 0.1 : 0; }
-const musTick = () => {
+let playSong = (s) => { mus = s; mStep = 0; mNext = AC ? AC.currentTime + 0.1 : 0; }
+let musTick = () => {
   if (!AC || !mus || AC.state !== 'running') return;
-  const sp = 60 / mus.bpm / 4;
+  let sp = 60 / mus.bpm / 4;
   if (mNext < AC.currentTime - 0.2) mNext = AC.currentTime + 0.05;
   while (mNext < AC.currentTime + 0.15) {
-    const i = mStep, dl = mNext - AC.currentTime, b = mus.b[i % mus.b.length], l = mus.l[i % mus.l.length];
+    let i = mStep, dl = mNext - AC.currentTime, b = mus.b[i % mus.b.length], l = mus.l[i % mus.l.length];
     if (b !== '.') tone(mf(mus.r + b.charCodeAt(0) - 97 - 12), sp * 1.8, 'triangle', 0.16, dl);
     if (l !== '.') tone(mf(mus.r + l.charCodeAt(0) - 97 + 12), sp * 1.5, SQ, 0.04, dl);
     if (i % 4 === 0) tone(150, 0.12, 'sine', 0.3, dl, 40);
@@ -146,27 +148,27 @@ const musTick = () => {
 }
 
 // ---------- Helpers ----------
-const css = (n) => '#' + n.toString(16).padStart(6, '0');
-const shd = (c, f) => { const ch = (v) => MN(255, v * f) | 0; return (ch(c >> 16 & 255) << 16) | (ch(c >> 8 & 255) << 8) | ch(c & 255); };
+let css = (n) => '#' + n.toString(16).padStart(6, '0');
+let shd = (c, f) => { let ch = (v) => MN(255, v * f) | 0; return (ch(c >> 16 & 255) << 16) | (ch(c >> 8 & 255) << 8) | ch(c & 255); };
 // Headings (28px+) use the poster's chunky italic display face; small text stays monospace.
-const TS = (sz, col = WH, d = sz > 27) => ({ fontFamily: d ? FONT.slice(3) : 'monospace', fontSize: sz + 'px', fontStyle: d ? 'italic' : 'bold', color: col, stroke: DK, strokeThickness: MX(3, sz / 6 | 0), padding: { x: sz / 8 } });
-const cl = (v, a, b) => MX(a, MN(b, v));
+let TS = (sz, col = WH, d = sz > 27) => ({ fontFamily: d ? FONT.slice(3) : 'monospace', fontSize: sz + 'px', fontStyle: d ? 'italic' : 'bold', color: col, stroke: DK, strokeThickness: MX(3, sz / 6 | 0), padding: { x: sz / 8 } });
+let cl = (v, a, b) => MX(a, MN(b, v));
 let sd = 1;
-const rr = () => (sd = sd * 16807 % 2147483647) / 2147483647;
-const ri = (a, b) => a + rr() * (b - a) | 0;
+let rr = () => (sd = sd * 16807 % 2147483647) / 2147483647;
+let ri = (a, b) => a + rr() * (b - a) | 0;
 
 // DM: end time of the attract demo (0 = a real game). KY: a real key was pressed.
 let S, AD, CM, MODE, L, HUD, st, P = [null, null], E = [], PR = [], IT = [], AL = [], WO = [], UI = [], FIN = [], frz = 0, DM = 0, KY = 0;
-const G = {};
+let G = {};
 
 // ---------- Heroes, enemies, stages ----------
-const HER = [
+let HER = [
   { n: 'RUTA', c: 0xff3ca6, sp: 3.6, pw: 8, rg: 30, x: 'dash', d: 'INFILTRADORA URBANA', b: 'DASH PARKOUR', st: [5, 2, 3], cry: '¡AL TOQUE!' },
   { n: 'PUERTO', c: 0xff8a1e, sp: 2.5, pw: 13, rg: 36, x: 'drone', d: 'TÉCNICO DE HARDWARE', b: 'DRON ALIADO', st: [2, 5, 3], cry: '¡DRON, PO!' },
   { n: 'ANDES', c: 0x9b5cff, sp: 2.9, pw: 10, rg: 38, x: 'holo', d: 'CRIPTÓGRAFA', b: 'HOLOGRAMA', st: [3, 3, 5], cry: '¡CIFRADO!' },
   { n: 'BYTE', c: 0x39ff6a, sp: 3.1, pw: 10, rg: 32, x: 'emp', d: 'INGENIERO SOCIAL', b: 'PULSO EMP', st: [4, 3, 4], cry: '¡SE CAYÓ EL SISTEMA!' },
 ];
-const LOOK = {
+let LOOK = {
   h0: { sk: 0xe8b08a, hr: 0xb0208a, hl: 1, hd: 0xff3ca6, pa: 0x1c1c26, sh: 0xf4f4f4, gg: 1, bp: 0x2c2c40, ac: 0xffffff, hood: 1 },
   h1: { sk: 0xc68a5e, hr: 0x1a1010, hd: 0xf07c1a, cap: 0x2a5ab8, hp: 0x1a1a1a, hpc: 0xff8a1e, pa: 0x5a5a40, sh: 0x4a3020, wr: 1 },
   h2: { sk: 0xdca47e, hr: 0x3a1a5a, hl: 1, hd: 0x9b5cff, jk: 0x2a2440, gl: 0x9b5cff, pa: 0x2a2a36, sh: 0xdcdcff, hood: 1 },
@@ -183,8 +185,8 @@ Object.assign(LOOK, {
   b3: { ...LOOK.ex, hr: 0x6a2a8a, hl: 1, hd: 0xf0f0f4, ct: 0xe4e4ec, tie: 0, hm: 0x7ab8f0, vz: 0xe8f8ff },
   b4: { ...LOOK.tk, sk: 0xd8a080, hd: 0x2a6ab0, ct: 0x2a6ab0, cap: 0, ac: 0, hm: 0xe8e0d0, vz: 0x40e0ff, bd: 0xf4f4f4, pd: 0xe8e0d0 },
 });
-const POSES = ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'p1', 'p2', 'k', 'j', 'jk', 'h', 's', 'b'];
-const ED = {
+let POSES = ['i0', 'i1', 'w0', 'w1', 'w2', 'w3', 'p1', 'p2', 'k', 'j', 'jk', 'h', 's', 'b'];
+let ED = {
   gd: { hp: 34, sp: 1.5, dm: 8, sc: 100 },
   tk: { hp: 52, sp: 1.3, dm: 11, sc: 150 },
   ex: { hp: 40, sp: 1.6, dm: 7, sc: 200 },
@@ -192,7 +194,7 @@ const ED = {
   dg: { hp: 28, sp: 2.6, dm: 10, sc: 120 },
 };
 // Boss: [name, sprite, scale, hp, moves (p punch, c charge, s shoot, m summon, t stomp, h stage hazard), line]
-const STG = [
+let STG = [
   { n: 'SANTIAGO CENTRO', s: 'Metro U. de Chile · Paseo Ahumada', pool: 'gd', b: ['GUARDIA MAX', 'b0', 1.8, 380, 'pc', '¡Alto ahí, cabros!'], sg: [['PASEO AHUMADA', 0x1c5aa0, 240], ['METRO U. DE CHILE', 0xd8202a, 1250]] },
   { n: 'PROVIDENCIA', s: 'Los Leones · ¡ojo, piso mojado!', pool: 'gd,ex,dr', b: ['CEO-BOT 3000', 'b1', 1.75, 460, 'pms', 'Esta reunión pudo ser un mail.'], sg: [['METRO LOS LEONES', 0xd8202a, 1300]] },
   { n: 'VALPARAÍSO', s: '¡Ojo con los contenedores!', pool: 'gd,tk,dg', b: ['CAPATAZ GRÚA', 'b2', 1.9, 540, 'pcth', '¡Del puerto no sale ni un token!'], sg: [['CERRO ALEGRE', 0x1c5aa0, 1494]] },
@@ -200,43 +202,43 @@ const STG = [
   { n: 'PATAGONIA', s: 'Donde el diablo perdió el poncho', pool: 'tk,dg,dr,ex', b: ['CAPITÁN GLACIAR', 'b4', 1.95, 620, 'pcht', '¡Acá manda el viento, cabros!'], sg: [['TORRES DEL PAINE', 0x2a7a3a, 1500]] },
   { n: 'COSTANERA CENTER', s: 'Piso 62 · láseres de seguridad', pool: 'gd,tk,ex,dr,dg', b: ['EL CÓNDOR', 'cd', 1.3, 750, 'csmth', 'Todos los tokens son míos.'], sg: [] },
 ];
-const SL = ['¡WENA!', '¡BACÁN!', '¡TOMA, PO!', '¡CHAO!', '¡SEEE!', '¡FUISTE!', '¡PA LA CASA!', '¡CACHAI!', '¡LA RAJA!', '¡AL TIRO!', '¡SALTA PAL LAO!'];
-const ITEMS = [['¡COMPLETO, UN MANJAR!', '#fc2'], ['¡PLÁTANO HACK!', PL], ['¡BIP! +500', CY], ['¡MOTE CON HUESILLO!', '#fa4']];
+let SL = ['¡WENA!', '¡BACÁN!', '¡TOMA, PO!', '¡CHAO!', '¡SEEE!', '¡FUISTE!', '¡PA LA CASA!', '¡CACHAI!', '¡LA RAJA!', '¡AL TIRO!', '¡SALTA PAL LAO!'];
+let ITEMS = [['¡COMPLETO, UN MANJAR!', '#fc2'], ['¡PLÁTANO HACK!', PL], ['¡BIP! +500', CY], ['¡MOTE CON HUESILLO!', '#fa4']];
 
 // ---------- Procedural art ----------
-const cv = (k, w, h, fn) => { const t = S.textures.createCanvas(k, w, h); fn(t.getContext(), w, h); t.refresh(); return t; }
-const pix = (k, w, h, draw, s = 3, ol = 0x140a1c) => {
-  const b = new Array(w * h).fill(0);
-  const R = (x, y, ww, hh, c) => { for (let j = y; j < y + hh; j++) for (let i = x; i < x + ww; i++) if (i >= 0 && j >= 0 && i < w && j < h) b[j * w + i] = c; };
+let cv = (k, w, h, fn) => { let t = S.textures.createCanvas(k, w, h); fn(t.getContext(), w, h); t.refresh(); return t; }
+let pix = (k, w, h, draw, s = 3, ol = 0x140a1c) => {
+  let b = new Array(w * h).fill(0);
+  let R = (x, y, ww, hh, c) => { for (let j = y; j < y + hh; j++) for (let i = x; i < x + ww; i++) if (i >= 0 && j >= 0 && i < w && j < h) b[j * w + i] = c; };
   draw(R);
-  const o = b.slice();
+  let o = b.slice();
   if (ol) for (let j = 0; j < h; j++) rp(w, (i) => {
-    const q = j * w + i;
+    let q = j * w + i;
     if (!b[q] && ((i && b[q - 1]) || (i < w - 1 && b[q + 1]) || (j && b[q - w]) || (j < h - 1 && b[q + w]))) o[q] = ol;
   });
   cv(k, w * s, h * s, (c) => { for (let q = 0; q < w * h; q++) if (o[q]) { FR(c, css(o[q]), q % w * s, (q / w | 0) * s, s, s); } });
 }
 
 // One 23x30 pixel figure, facing right, in pose p.
-const human = (R, L, p) => {
-  const T = 10 + (p === 'i1') - (p === 'j' || p === 'jk'), ox = -(p === 'h') - (p === 'k');
-  const sk = L.sk, top = L.jk || L.hd;
+let human = (R, L, p) => {
+  let T = 10 + (p === 'i1') - (p === 'j' || p === 'jk'), ox = -(p === 'h') - (p === 'k');
+  let sk = L.sk, top = L.jk || L.hd;
   // Q: R shifted by the pose offset ox.
-  const Q = (x, y, w, h, c) => R(x + ox, y, w, h, c);
-  const A = (x, y, w, h, c) => { Q(x, y, w, h, c); Q(x, y, 1, h, shd(c, 0.6)); };
+  let Q = (x, y, w, h, c) => R(x + ox, y, w, h, c);
+  let A = (x, y, w, h, c) => { Q(x, y, w, h, c); Q(x, y, 1, h, shd(c, 0.6)); };
   if (L.bp) { Q(3, T + 1, 4, 8, L.bp); Q(4, T + 2, 2, 2, 0xffd21a); Q(4, T + 6, 2, 1, 0x40e0ff); }
   if (L.sb) { Q(3, T - 3, 2, 15, L.sb); Q(2, T - 1, 1, 2, 0xdddddd); Q(2, T + 9, 1, 2, 0xdddddd); }
   if (L.hl) Q(5, T - 7, 4, 9, L.hr);
-  const Pa = L.pa, Sh = L.sh, leg = (x, h) => { R(x, 20, 3, h, Pa); R(x, 20 + h, 4, 2, Sh); };
+  let Pa = L.pa, Sh = L.sh, leg = (x, h) => { R(x, 20, 3, h, Pa); R(x, 20 + h, 4, 2, Sh); };
   if (p === 'k') { leg(8, 7); R(12, 19, 8, 3, Pa); R(20, 18, 2, 4, Sh); }
   else if (p === 'j' || p === 'jk') {
     R(7, 20, 3, 4, Pa); R(7, 24, 4, 2, Sh);
     if (p === 'j') { R(11, 19, 3, 4, Pa); R(12, 23, 4, 2, Sh); } else { R(12, 19, 7, 3, Pa); R(19, 18, 2, 4, Sh); }
   } else {
-    const o = { w0: [5, 13, 7, 7], w1: [8, 10, 6, 7], w2: [5, 13, 7, 7], w3: [8, 10, 7, 6] }[p] || [7, 11, 7, 7];
+    let o = { w0: [5, 13, 7, 7], w1: [8, 10, 6, 7], w2: [5, 13, 7, 7], w3: [8, 10, 7, 6] }[p] || [7, 11, 7, 7];
     leg(o[0], o[2]); leg(o[1], o[3]);
   }
-  const ac = shd(top, 0.8), af = shd(top, 0.95);
+  let ac = shd(top, 0.8), af = shd(top, 0.95);
   if (p === 'p2') { A(11, T + 3, 8, 3, ac); Q(19, T + 3, 3, 3, sk); }
   else if (p === 's') { A(7, T - 6, 3, 8, ac); Q(7, T - 8, 3, 2, sk); }
   else if (p === 'h') { A(3, T + 1, 4, 3, ac); Q(1, T + 1, 2, 3, sk); }
@@ -249,7 +251,7 @@ const human = (R, L, p) => {
   if (L.ct) Q(6, T + 8, 9, 7, L.ct);
   if (L.pd) { Q(4, T - 1, 4, 4, L.pd); Q(14, T - 1, 4, 4, L.pd); }
   if (L.hood) Q(5, T - 1, 4, 3, L.hd);
-  const hx = 8 + ox, hy = T - 8;
+  let hx = 8 + ox, hy = T - 8;
   R(hx + 2, T - 1, 3, 1, sk);
   R(hx, hy, 7, 7, sk); R(hx + 5, hy + 3, 1, 2, 0x1a0c14); R(hx + 4, hy + 6, 3, 1, shd(sk, 0.75));
   R(hx, hy - 1, 7, 2, L.hr); R(hx, hy, 2, 4, L.hr);
@@ -269,17 +271,17 @@ const human = (R, L, p) => {
   else if (p === 'b') { A(13, T - 6, 3, 8, af); Q(13, T - 8, 3, 2, sk); }
   else { A(10, T + 1, 3, 8, af); Q(10, T + 9, 3, 2, sk); }
 }
-const drone = (R, f) => {
+let drone = (R, f) => {
   R(5, 4, 8, 4, 0x5a6070); R(6, 3, 6, 1, 0x8a90a0); R(10, 5, 2, 2, 0xff2a3a); R(8, 8, 2, 2, 0x333344);
   R(3, 1, 1, 3, 0x444455); R(14, 1, 1, 3, 0x444455); R(f ? 0 : 2, 1, f ? 7 : 3, 1, 0xccccdd); R(f ? 11 : 13, 1, f ? 7 : 3, 1, 0xccccdd);
 }
-const dog = (R, f) => {
-  const c = 0x8c919c, d = 0x4a4f5a;
+let dog = (R, f) => {
+  let c = 0x8c919c, d = 0x4a4f5a;
   R(3, 3, 13, 5, c); R(3, 3, 13, 1, 0xc0c4cc); R(14, 0, 7, 5, c); R(18, 2, 2, 1, 0xff2a3a); R(19, 4, 3, 1, d); R(0, 2, 4, 1, d);
   FE((f === 2 ? [1, 4, 15, 18] : f ? [3, 6, 12, 15] : [5, 7, 10, 13]), (x) => R(x, 8, 2, 4, d));
 }
-const condor = (R, f) => {
-  const k = 0x1a1a24, m = 0x3a3e4c, y = f ? 2 : 8;
+let condor = (R, f) => {
+  let k = 0x1a1a24, m = 0x3a3e4c, y = f ? 2 : 8;
   R(0, y, 13, 24, k); R(31, y, 13, 24, k);
   rp(4, (i) => { R(1 + i * 3, y + 22, 2, 5 + i % 2 * 3, 0x9aa0ac); R(32 + i * 3, y + 22, 2, 5 + (i + 1) % 2 * 3, 0x9aa0ac); });
   R(15, 31, 5, 11, m); R(24, 31, 5, 11, m); R(13, 42, 8, 3, 0xd6a020); R(23, 42, 8, 3, 0xd6a020);
@@ -290,7 +292,7 @@ const condor = (R, f) => {
 }
 
 // The Platanus logo: a yellow disc with three cream banana strokes.
-const platanusLogo = (c, x, y, r) => {
+let platanusLogo = (c, x, y, r) => {
   FS(c, PL); DOT(c, x, y, r);
   SS(c, '#ffd'); c.lineCap = 'butt';
   [[0.05, -0.66, 0.12, -0.05, -0.72, -0.07, 0.075], [0.12, -0.62, 0.16, 0.04, -0.44, 0.39, 0.09], [0.17, -0.65, 0.68, 0.02, 0.2, 0.72, 0.11]]
@@ -300,20 +302,20 @@ const platanusLogo = (c, x, y, r) => {
     });
 }
 
-const grad = (c, h, stops, y0 = 0) => { const g = c.createLinearGradient(0, y0, 0, h); FE(stops, (s, i) => g.addColorStop(i / (stops.length - 1), s)); return g; }
-const poly = (c, pts, col) => { FS(c, col); c.beginPath(); FE(pts, ([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); }
-const FONT = 'px Impact,"Arial Black",sans-serif';
+let grad = (c, h, stops, y0 = 0) => { let g = c.createLinearGradient(0, y0, 0, h); FE(stops, (s, i) => g.addColorStop(i / (stops.length - 1), s)); return g; }
+let poly = (c, pts, col) => { FS(c, col); c.beginPath(); FE(pts, ([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); }
+let FONT = 'px Impact,"Arial Black",sans-serif';
 // Chilean flag with its five-point star, w wide.
-const flag = (c, x, y, w) => {
-  const h = w * 2 / 3;
+let flag = (c, x, y, w) => {
+  let h = w * 2 / 3;
   FR(c, DK, x - 4, y - 4, w + 8, h + 8);
   FR(c, WH, x, y, w, h / 2);
   FR(c, '#d32', x, y + h / 2, w, h / 2);
   FR(c, '#03a', x, y, h / 2, h / 2);
-  poly(c, [...Array(10)].map((_, i) => { const r = (i % 2 ? 0.4 : 1) * h / 7, a = i * PI / 5 - PI / 2; return [x + h / 4 + r * COS(a), y + h / 4 + r * SIN(a)]; }), WH);
+  poly(c, [...Array(10)].map((_, i) => { let r = (i % 2 ? 0.4 : 1) * h / 7, a = i * PI / 5 - PI / 2; return [x + h / 4 + r * COS(a), y + h / 4 + r * SIN(a)]; }), WH);
 }
 // Title logo: slanted chrome/neon words and the flag.
-const logoTex = () => {
+let logoTex = () => {
   cv('logo', 700, 270, (c) => {
     c.setTransform(1, 0, -0.2, 1, 40, 0);
     FE([['HACKERS', 84, 78, PK, [WH, '#8ff', '#27f']], ['MUTANTES', 172, 84, '#314', [YL, PK, '#92f']], ['CHILENOS', 248, 60, CY, [WH, '#cce', '#669']]], ([t, y, z, o, g]) => {
@@ -326,7 +328,7 @@ const logoTex = () => {
   });
 }
 // Slanted name badge with a colored tab, like the arcade poster.
-const badge = (k, t, col) => {
+let badge = (k, t, col) => {
   cv(k, 150, 36, (c) => {
     poly(c, [[14, 2], [148, 2], [136, 34], [2, 34]], DK);
     LW(c, 3); SS(c, css(col)); c.stroke();
@@ -334,29 +336,29 @@ const badge = (k, t, col) => {
     c.font = 'italic 900 20' + FONT; c.textAlign = 'center'; FS(c, WH); c.fillText(t, 88, 26, 96);
   });
 }
-const ridge = (c, base, amp, step, col, snow) => {
-  const hs = [];
+let ridge = (c, base, amp, step, col, snow) => {
+  let hs = [];
   for (let x = 0; x <= 800; x += step) hs.push(base - rr() * amp);
   hs[hs.length - 1] = hs[0];
   poly(c, [[0, 390], ...hs.map((y, i) => [i * step, y]), [800, 390]], col);
   if (snow) FE(hs, (y, i) => { if (y < base - amp * 0.55) poly(c, [[i * step, y], [i * step - 20, y + 24], [i * step + 20, y + 24]], snow); });
 }
-const city = (c, col, lit, h0, h1) => {
+let city = (c, col, lit, h0, h1) => {
   for (let x = 0; x < 800;) {
-    const w = ri(26, 64), h = ri(h0, h1);
+    let w = ri(26, 64), h = ri(h0, h1);
     FR(c, col, x, 390 - h, w - 2, h);
     if (lit) for (let y = 396 - h; y < 384; y += 9) for (let i = x + 4; i < x + w - 6; i += 8) if (rr() < 0.35) { FR(c, rr() < 0.7 ? '#fd6' : '#6df', i, y, 3, 4); }
     x += w;
   }
 }
 // The Costanera Center tower on the skyline.
-const tower = (c, x, col, lit) => {
+let tower = (c, x, col, lit) => {
   poly(c, [[x - 16, 390], [x - 7, 40], [x + 7, 40], [x + 16, 390]], col);
   FR(c, col, x - 5, 22, 10, 20);
   if (lit) { FS(c, '#6df'); for (let y = 60; y < 380; y += 14) FR(c, 0, x - 4, y, 8, 2); }
 }
-const tag = (c, x, y, w) => {
-  const cols = [PK, '#3f6', CY, YL, '#95f', '#f82'];
+let tag = (c, x, y, w) => {
+  let cols = [PK, '#3f6', CY, YL, '#95f', '#f82'];
   LW(c, 3); c.lineCap = 'round';
   rp(2, (k) => {
     SS(c, cols[ri(0, 6)]); c.beginPath(); c.moveTo(x, y + ri(0, 24));
@@ -364,13 +366,13 @@ const tag = (c, x, y, w) => {
     c.stroke();
   });
 }
-const txtC = (c, t, x, y, sz, col) => { c.font = 'bold ' + sz + 'px monospace'; c.textAlign = 'center'; FS(c, col); c.fillText(t, x, y); }
+let txtC = (c, t, x, y, sz, col) => { c.font = 'bold ' + sz + 'px monospace'; c.textAlign = 'center'; FS(c, col); c.fillText(t, x, y); }
 
-const cloud = (c, x, y) => { FS(c, 'rgba(255,255,255,.85)'); FE([[0, 0, 40], [34, -12, 30], [64, 2, 34]], ([a, b, r]) => { DOT(c, x + a, y + b, r, r * 0.6); }); };
+let cloud = (c, x, y) => { FS(c, 'rgba(255,255,255,.85)'); FE([[0, 0, 40], [34, -12, 30], [64, 2, 34]], ([a, b, r]) => { DOT(c, x + a, y + b, r, r * 0.6); }); };
 // Skies: 0 Santiago golden hour, 1 Providencia dusk, 2 Valpo day, 3 Atacama dusk, 4 Patagonia, 5 Costanera night, 6 title dusk.
-const DUSK = ['#113', '#428', '#b49', '#f87', '#fb7'];
-const SKY = [['#79d', '#cbe', '#fc9'], DUSK, ['#49e', '#acf', '#eef'], ['#225', '#948', '#f96', '#fc8'], ['#36b', '#9ce', '#fdc'], ['#001', '#112', '#224'], DUSK];
-const farLayer = (s) => {
+let DUSK = ['#113', '#428', '#b49', '#f87', '#fb7'];
+let SKY = [['#79d', '#cbe', '#fc9'], DUSK, ['#49e', '#acf', '#eef'], ['#225', '#948', '#f96', '#fc8'], ['#36b', '#9ce', '#fdc'], ['#001', '#112', '#224'], DUSK];
+let farLayer = (s) => {
   cv('f' + s, 800, 390, (c) => {
     sd = 5 + s;
     FR(c, grad(c, 390, SKY[s]), 0, 0, 800, 390);
@@ -391,7 +393,7 @@ const farLayer = (s) => {
       FS(c, '#346');
       FE([[90, 1], [300, -1]], ([x, d]) => { FR(c, 0, x, 150, 8, 100); FR(c, 0, d < 0 ? x - 92 : x - 10, 150, 110, 6); FR(c, 0, x + d * 70, 156, 2, 50); });
       FR(c, 0, 380, 228, 170, 24);
-      const cc = ['#c33', '#37c', '#ea3', '#3a7'];
+      let cc = ['#c33', '#37c', '#ea3', '#3a7'];
       rp(12, (i) => { FR(c, cc[i % 4], 390 + i % 6 * 24, 216 - (i / 6 | 0) * 10, 22, 9); });
       poly(c, [[0, 390], [0, 170], [120, 200], [200, 260], [260, 390]], '#464');
     }
@@ -417,17 +419,17 @@ const farLayer = (s) => {
   });
 }
 
-const midLayer = (s) => {
+let midLayer = (s) => {
   cv('m' + s, 1024, 290, (c) => {
     sd = 30 + s;
     [downtown, provi, valpo, atacama, patag, torre][s](c);
   });
 }
-const downtown = (c) => {
-  const shops = ['FARMACIA', 'CAMBIO', 'COMPLETOS', 'ÓPTICA', 'CELULARES', 'SUSHI', 'LIBRERÍA', 'SOPAIPILLAS'], sm = [];
+let downtown = (c) => {
+  let shops = ['FARMACIA', 'CAMBIO', 'COMPLETOS', 'ÓPTICA', 'CELULARES', 'SUSHI', 'LIBRERÍA', 'SOPAIPILLAS'], sm = [];
   for (let x = 0; x < 1024;) {
     let w = ri(180, 250); if (1024 - x - w < 150) w = 1024 - x;
-    const top = ri(0, 50), aw = ['#d33', '#284', '#25c', '#e92'][ri(0, 4)];
+    let top = ri(0, 50), aw = ['#d33', '#284', '#25c', '#e92'][ri(0, 4)];
     sm.push(x);
     if (top > 34) { FR(c, '#ddd', x + 20, top - 36, 2, 36); flag(c, x + 24, top - 34, 27); }
     FR(c, ['#cb9', '#ba7', '#dca', '#aab', '#c99'][ri(0, 5)], x, top, w, 290 - top);
@@ -448,29 +450,29 @@ const downtown = (c) => {
   FS(c, '#b84'); DOT(c, 610, 280, 26, 9); DOT(c, 588, 276, 8); FR(c, '#753', 583, 267, 5, 7); txtC(c, 'z Z', 590, 258, 11, WH);
   rp(8, (i) => { FR(c, [YL, CY, PK, WH][i % 4], 478 + i % 4 * 20, 222 + (i >> 2) * 22, 14, 18); });
 }
-const provi = (c) => {
+let provi = (c) => {
   // Office blocks with gaps, so the Andes and the Costanera show through behind them.
   for (let x = 0; x < 1024; x += 256) {
     FR(c, '#223', x + 140, 30, 110, 140);
-    for (let y = 40; y < 160; y += 18) for (let i = x + 148; i < x + 240; i += 18) { const r = rr(); FR(c, r < 0.3 ? '#fd6' : r < 0.45 ? '#6df' : '#224', i, y, 12, 12); }
+    for (let y = 40; y < 160; y += 18) for (let i = x + 148; i < x + 240; i += 18) { let r = rr(); FR(c, r < 0.3 ? '#fd6' : r < 0.45 ? '#6df' : '#224', i, y, 12, 12); }
   }
   FR(c, '#112', 0, 150, 1024, 140);
   // One shop per storefront, so no name repeats inside the 1024px tile.
-  const ns = ['SUSHI', 'BOTILLERÍA', 'CAFÉ', 'SCHOPERÍA'];
+  let ns = ['SUSHI', 'BOTILLERÍA', 'CAFÉ', 'SCHOPERÍA'];
   for (let x = 0; x < 1024; x += 256) {
     FR(c, '#111', x + 16, 196, 224, 94);
     FR(c, 'rgba(120,160,255,.08)', x + 24, 204, 208, 80);
-    const col = [PK, CY, '#3f6', YL][ri(0, 4)];
+    let col = [PK, CY, '#3f6', YL][ri(0, 4)];
     c.shadowColor = col; c.shadowBlur = 14; SS(c, col); LW(c, 3); c.strokeRect(x + 48, 160, 160, 30);
     txtC(c, ns[x >> 8], x + 128, 183, 20, col); c.shadowBlur = 0;
     tag(c, x + 220, 230, 40);
   }
 }
-const valpo = (c) => {
+let valpo = (c) => {
   poly(c, [[0, 290], [0, 40], [260, 10], [470, 70], [560, 190], [840, 190], [940, 80], [1024, 40], [1024, 290]], '#454');
-  const hc = ['#fc3', '#3af', '#f46', '#7d4', '#f82', '#c6f', '#eee', '#2ca'];
+  let hc = ['#fc3', '#3af', '#f46', '#7d4', '#f82', '#c6f', '#eee', '#2ca'];
   rp(24, (i) => {
-    const x = i % 4 ? ri(0, 400) : ri(900, 990), y = ri(40, 130), w = ri(40, 70), h = ri(34, 52);
+    let x = i % 4 ? ri(0, 400) : ri(900, 990), y = ri(40, 130), w = ri(40, 70), h = ri(34, 52);
     FR(c, hc[ri(0, 8)], x, y, w, h);
     FR(c, '#533', x - 3, y - 6, w + 6, 7);
     FS(c, '#234'); for (let k = x + 8; k < x + w - 10; k += 16) FR(c, 0, k, y + 10, 9, 12);
@@ -485,7 +487,7 @@ const valpo = (c) => {
   FE([306, 334], (x) => { FS(c, YL); DOT(c, x, 242, 8, 10); FR(c, '#111', x - 2, 235, 4, 14); });
   c.font = 'bold 40px monospace'; c.textAlign = 'center'; LW(c, 5); SS(c, '#212'); c.strokeText('VALPO', 640, 262); FS(c, '#fc3'); c.fillText('VALPO', 640, 262);
 }
-const atacama = (c) => {
+let atacama = (c) => {
   FE([[120, 1], [430, 0.8], [760, 1.1]], ([x, k]) => {
     FR(c, '#ccd', x - 6, 110, 12, 92);
     c.save(); c.translate(x, 100); c.rotate(-0.5);
@@ -501,7 +503,7 @@ const atacama = (c) => {
   for (let x = -96; x < 1100; x += 12) { LN(c, x, 206, x + 84, 290); LN(c, x, 290, x + 84, 206); }
 }
 // Patagonia: estancia houses with tin roofs, wind-bent lengas, a fence and a guanaco.
-const patag = (c) => {
+let patag = (c) => {
   for (let x = 30; x < 1024; x += 330) {
     FR(c, ['#dca', '#abc', '#edb'][ri(0, 3)], x, 150, 150, 100);
     poly(c, [[x - 10, 152], [x + 75, 110], [x + 160, 152]], rr() < 0.5 ? '#b32' : '#374');
@@ -511,12 +513,12 @@ const patag = (c) => {
     poly(c, [[x + 216, 250], [x + 232, 250], [x + 252, 172], [x + 240, 168]], '#432');
     FS(c, '#363'); FE([[248, 172, 20], [270, 164, 26], [294, 170, 20]], ([a, b, r]) => DOT(c, x + a, b, r, r * 0.6));
   }
-  const g = 700, k = '#c95';
+  let g = 700, k = '#c95';
   FR(c, k, g, 196, 44, 18); FR(c, k, g + 38, 166, 8, 34); FR(c, k, g + 36, 160, 16, 9); FR(c, k, g + 40, 154, 3, 7); FR(c, '#edc', g + 4, 206, 36, 8);
   FE([2, 10, 30, 38], (d) => FR(c, '#863', g + d, 214, 4, 26));
   FR(c, '#642', 0, 240, 1024, 4); for (let x = 0; x < 1024; x += 32) FR(c, '#642', x, 228, 5, 36);
 }
-const torre = (c) => {
+let torre = (c) => {
   FR(c, 'rgba(120,170,255,.07)', 0, 0, 1024, 150);
   FS(c, '#223'); for (let x = 0; x < 1024; x += 128) FR(c, 0, x, 0, 6, 150);
   FR(c, 0, 0, 70, 1024, 4); FR(c, 0, 0, 146, 1024, 8);
@@ -530,7 +532,7 @@ const torre = (c) => {
   FR(c, '#889', 580, 170, 100, 120); FR(c, '#567', 629, 170, 2, 120);
   txtC(c, 'PISO 62', 630, 164, 13, '#f34');
 }
-const groundLayer = (s) => {
+let groundLayer = (s) => {
   cv('g' + s, 256, 210, (c) => {
     sd = 50 + s;
     FR(c, ['#ba9', '#112', '#656', '#843', '#877', '#112'][s], 0, 0, 256, 210);
@@ -553,8 +555,8 @@ const groundLayer = (s) => {
 }
 // Stage signs stand on two posts at the back of the sidewalk. The metro runs underground, so a
 // METRO sign marks a street entrance: a railing and an opening in the sidewalk with stairs going down.
-const signTex = (k, t, bg) => {
-  const w = t.length * 11 + 24;
+let signTex = (k, t, bg) => {
+  let w = t.length * 11 + 24;
   cv(k, w, 108, (c) => {
     FR(c, '#455', 12, 30, 5, 54); FR(c, 0, w - 17, 30, 5, 54);
     FR(c, '#eee', 0, 0, w, 30); FR(c, css(bg), 3, 3, w - 6, 24); txtC(c, t, w / 2, 20, 15, WH);
@@ -567,8 +569,8 @@ const signTex = (k, t, bg) => {
   });
 }
 
-const genArt = () => {
-  for (const k in LOOK) for (const p of POSES) pix(k + '_' + p, 23, 30, (R) => human(R, LOOK[k], p));
+let genArt = () => {
+  for (let k in LOOK) for (let p of POSES) pix(k + '_' + p, 23, 30, (R) => human(R, LOOK[k], p));
   FE([0, 1], (f) => { pix('dr' + f, 18, 10, (R) => drone(R, f)); pix('cd' + f, 44, 46, (R) => condor(R, f)); });
   FE([0, 1, 2], (f) => pix('dg' + f, 22, 13, (R) => dog(R, f)));
   pix('it0', 14, 7, (R) => { R(0, 3, 14, 4, 0xd99a4a); R(1, 2, 12, 2, 0xb8462a); R(2, 1, 10, 1, 0x86c840); R(3, 1, 2, 1, 0xe83a3a); R(8, 1, 2, 1, 0xe83a3a); R(1, 0, 12, 1, 0xf6f0d0); });
@@ -596,86 +598,86 @@ const genArt = () => {
   });
   cv('rn', 256, 256, (c) => {
     SS(c, 'rgba(170,200,255,.4)');
-    rp(70, (i) => { const x = rr() * 256, y = rr() * 256; LN(c, x, y, x - 4, y + 14); });
+    rp(70, (i) => { let x = rr() * 256, y = rr() * 256; LN(c, x, y, x - 4, y + 14); });
   });
   FE(HER, (h, i) => badge('nb' + i, h.n, h.c));
 }
 
 // ---------- UI helpers ----------
-const ui = (o, d = 1000) => { o.setScrollFactor(0).setDepth(d); UI.push(o); return o; }
-const txt = (x, y, s, sz, col, ox = 0.5) => AD.text(x, y, s, TS(sz, col)).setOrigin(ox, 0.5);
+let ui = (o, d = 1000) => { o.setScrollFactor(0).setDepth(d); UI.push(o); return o; }
+let txt = (x, y, s, sz, col, ox = 0.5) => AD.text(x, y, s, TS(sz, col)).setOrigin(ox, 0.5);
 // UI text in one call: ut(x, y, text, size, depth = 10, color, originX).
-const ut = (x, y, t, sz, d = 10, col, ox) => ui(txt(x, y, t, sz, col, ox), d);
+let ut = (x, y, t, sz, d = 10, col, ox) => ui(txt(x, y, t, sz, col, ox), d);
 // Full-screen dim overlay and a tween shorthand (k: destroy the target when done).
-const dim = (a, d = 3, k = 0x0a0614) => ui(AD.rectangle(W / 2, H / 2, W, H, k, a), d);
-const tw = (t, o, k) => S.tweens.add({ targets: t, ...o, onComplete: k && (() => t.destroy()) });
+let dim = (a, d = 3, k = 0x0a0614) => ui(AD.rectangle(W / 2, H / 2, W, H, k, a), d);
+let tw = (t, o, k) => S.tweens.add({ targets: t, ...o, onComplete: k && (() => t.destroy()) });
 // Fade out over d ms after dl ms; destroys the object unless k is 0.
-const fo = (t, d, dl = 0, k = 1) => tw(t, { alpha: 0, duration: d, delay: dl }, k);
+let fo = (t, d, dl = 0, k = 1) => tw(t, { alpha: 0, duration: d, delay: dl }, k);
 // Screen-anchored tiling layer.
-const TL = (x, y, w, h, key, d) => ui(AD.tileSprite(x, y, w, h, key).setOrigin(0), d);
-const clearAll = () => { FE(UI, (o) => { S.tweens.killTweensOf(o); o.destroy(); }); UI = []; }
-const clearWorld = () => {
+let TL = (x, y, w, h, key, d) => ui(AD.tileSprite(x, y, w, h, key).setOrigin(0), d);
+let clearAll = () => { FE(UI, (o) => { S.tweens.killTweensOf(o); o.destroy(); }); UI = []; }
+let clearWorld = () => {
   FE([...E, ...PR, ...IT, ...AL], (o) => { o.s.destroy(); if (o.sd) o.sd.destroy(); });
   E = []; PR = []; IT = []; AL = [];
   FE(WO, (o) => o.destroy()); WO = [];
   FE(P, (p) => { if (p && p.s) { p.s.destroy(); p.sd.destroy(); p.s = null; } });
 }
 function camX() { return CM.scrollX; }
-const bgSet = (i) => {
+let bgSet = (i) => {
   return {
     f: TL(0, 0, W, FLOOR, 'f' + i, 0),
     m: TL(0, 100, W, 290, 'm' + i, 1),
     g: TL(0, FLOOR - 2, W, 210, 'g' + i, 2),
   };
 }
-const scrollBg = (x) => { L.f.tilePositionX = x * 0.2; L.m.tilePositionX = x; L.g.tilePositionX = x; if (L.p) L.p.tilePositionX = x * 1.4; }
-const duskBg = () => { L = bgSet(1); L.f.setTexture('f6'); L.m.setVisible(false); }
-const banner = (lines, ms = 2400) => {
+let scrollBg = (x) => { L.f.tilePositionX = x * 0.2; L.m.tilePositionX = x; L.g.tilePositionX = x; if (L.p) L.p.tilePositionX = x * 1.4; }
+let duskBg = () => { L = bgSet(1); L.f.setTexture('f6'); L.m.setVisible(false); }
+let banner = (lines, ms = 2400) => {
   FE(lines, (t, k) => {
-    const o = ut(-300, 210 + k * 46, t, k === 1 ? 40 : k ? 18 : 24, 4000, k === 1 ? YL : WH);
+    let o = ut(-300, 210 + k * 46, t, k === 1 ? 40 : k ? 18 : 24, 4000, k === 1 ? YL : WH);
     tw(o, { x: W / 2, duration: 350, delay: k * 120, ease: 'Back.Out' });
     fo(o, 400, ms, 0);
   });
 }
-const logoBadge = (x, y, s) => {
+let logoBadge = (x, y, s) => {
   ui(AD.image(x, y, 'plat').setScale(s), 10);
   ut(x, y + 66 * s + 10, 'PLATANUS HACK 26', 11, 10, PL);
 }
 
 // ---------- Effects ----------
-const spark = (x, y, col = 0xffffff) => {
-  const s = AD.image(x, y, 'sp').setDepth(2000).setAngle(RND() * 90).setTint(col);
+let spark = (x, y, col = 0xffffff) => {
+  let s = AD.image(x, y, 'sp').setDepth(2000).setAngle(RND() * 90).setTint(col);
   tw(s, { scale: { from: 0.6, to: 1.6 }, alpha: 0, duration: 200 }, 1);
 }
-const ring = (x, y, r, col) => {
-  const c = AD.circle(x, y - 30, r, col, 0.15).setStrokeStyle(6, col).setDepth(1999).setScale(0.1);
+let ring = (x, y, r, col) => {
+  let c = AD.circle(x, y - 30, r, col, 0.15).setStrokeStyle(6, col).setDepth(1999).setScale(0.1);
   tw(c, { scale: 1, alpha: 0, duration: 420 }, 1);
 }
-const pop = (x, y, t, col = WH, sz = 16) => {
-  const o = AD.text(x, y, t, TS(sz, col)).setOrigin(0.5).setDepth(3000);
+let pop = (x, y, t, col = WH, sz = 16) => {
+  let o = AD.text(x, y, t, TS(sz, col)).setOrigin(0.5).setDepth(3000);
   tw(o, { y: y - 40, alpha: { from: 1, to: 0 }, duration: 1100, ease: 'Quad.In' }, 1);
 }
-const boom = (x, y) => { rp(4, (i) => { spark(x + (RND() - 0.5) * 40, y + (RND() - 0.5) * 40, i % 2 ? 0xffa040 : 0xffffff); }); ring(x, y + 30, 50, 0xffa040); SFX_boom(); }
-const ghost = (p) => {
-  const g = hum(p.s.x, p.s.y, p.s.texture.key).setFlipX(p.f < 0).setTintFill(p.h.c).setAlpha(0.55).setDepth(p.y - 1);
+let boom = (x, y) => { rp(4, (i) => { spark(x + (RND() - 0.5) * 40, y + (RND() - 0.5) * 40, i % 2 ? 0xffa040 : 0xffffff); }); ring(x, y + 30, 50, 0xffa040); SFX_boom(); }
+let ghost = (p) => {
+  let g = hum(p.s.x, p.s.y, p.s.texture.key).setFlipX(p.f < 0).setTintFill(p.h.c).setAlpha(0.55).setDepth(p.y - 1);
   fo(g, 260);
 }
-const zap = (x1, y1, x2, y2, col) => fo(AD.line(0, 0, x1, y1, x2, y2, col).setOrigin(0).setLineWidth(3).setDepth(1998), 120);
-const debris = (e) => { dust(e.x, e.y, 5); spark(e.x, e.y - 20, e.v ? 0xb8864a : 0x3a9a4a); SFX_thud(); }
+let zap = (x1, y1, x2, y2, col) => fo(AD.line(0, 0, x1, y1, x2, y2, col).setOrigin(0).setLineWidth(3).setDepth(1998), 120);
+let debris = (e) => { dust(e.x, e.y, 5); spark(e.x, e.y - 20, e.v ? 0xb8864a : 0x3a9a4a); SFX_thud(); }
 // Function declarations (not arrows) so the minifier keeps tn/camX as short calls instead of inlining them.
 function tn() { return S.time.now; }
 // A player who is still in the game (not out of lives).
-const live = (p) => p && p.st !== 'o';
-const later = (ms, f) => S.time.delayedCall(ms, f);
+let live = (p) => p && p.st !== 'o';
+let later = (ms, f) => S.time.delayedCall(ms, f);
 // A human-rig sprite anchored at its feet.
-const hum = (x, y, k) => AD.image(x, y, k).setOrigin(0.46, 1);
+let hum = (x, y, k) => AD.image(x, y, k).setOrigin(0.46, 1);
 // Big shakes (boss death, quake, stomp) force past a small hit shake that is still running.
-const shake = (d, i) => CM.shake(d, i, i > 0.01);
+let shake = (d, i) => CM.shake(d, i, i > 0.01);
 // Squash (v > 0) or stretch (v < 0) that springs back to rest in 180 ms; drawE applies it.
-const squ = (o, v) => { o.sq = v; o.sqT = tn(); };
-const dust = (x, y, n = 3) => {
+let squ = (o, v) => { o.sq = v; o.sqT = tn(); };
+let dust = (x, y, n = 3) => {
   rp(n, (i) => {
-    const k = i - (n - 1) / 2, d = AD.circle(x + k * 12, y - 4, 5, 0xe8e0f0, 0.5).setDepth(y + 1);
+    let k = i - (n - 1) / 2, d = AD.circle(x + k * 12, y - 4, 5, 0xe8e0f0, 0.5).setDepth(y + 1);
     tw(d, { x: x + k * 26, y: y - 12, scale: 2.4, alpha: 0, duration: 380, ease: 'Quad.Out' }, 1);
   });
 }
@@ -691,32 +693,32 @@ function create() {
   loadBoard().then(() => { if (MODE === 't' && G.rt) G.rt.setText(recStr()); });
 }
 
-const update = (time, delta) => {
-  const dt = MN(delta, 50) / 16.67;
+let update = (time, delta) => {
+  let dt = MN(delta, 50) / 16.67;
   musTick();
   // Attract demo: bots play until a real key is pressed (START goes straight on to select) or time runs out.
-  if (DM) { if (KY || time > DM) { DM = 0; for (const k in held) if (k[0] === 'P') held[k] = false; title(); } else FE(P, (p) => live(p) && bot(p, time)); }
+  if (DM) { if (KY || time > DM) { DM = 0; for (let k in held) if (k[0] === 'P') held[k] = false; title(); } else FE(P, (p) => live(p) && bot(p, time)); }
   // Modes: t title, s select, p play, o game over, n name entry, e end screens.
-  const f = { t: upTitle, s: upSel, p: upPlay, n: upName, e: upEnd }[MODE];
-  const fz = MODE === 'p' && st && !st.end && frz > tn();
+  let f = { t: upTitle, s: upSel, p: upPlay, n: upName, e: upEnd }[MODE];
+  let fz = MODE === 'p' && st && !st.end && frz > tn();
   if (f) f(dt, time);
   // Keep taps pending through hit-stop frames so combo inputs are not dropped.
   if (!fz) was = { ...held };
 }
 
 // ---------- Title ----------
-const recStr = () => board.slice(0, 5).map((e, i) => `${i + 1}. ${e.n.padEnd(3)} ${String(e.s).padStart(7, '0')}`).join('\n') || 'SIN RÉCORDS AÚN\n¡SÉ EL PRIMERO!';
-const title = () => {
+let recStr = () => board.slice(0, 5).map((e, i) => `${i + 1}. ${e.n.padEnd(3)} ${String(e.s).padStart(7, '0')}`).join('\n') || 'SIN RÉCORDS AÚN\n¡SÉ EL PRIMERO!';
+let title = () => {
   clearAll(); clearWorld(); MODE = 't'; CM.setScroll(0, 0); G.dm = 0;
   duskBg();
-  const lg =ui(AD.image(W / 2, 150, 'logo').setScale(0.84), 10);
+  let lg =ui(AD.image(W / 2, 150, 'logo').setScale(0.84), 10);
   tw(lg, { y: 143, yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.InOut' });
   ut(W / 2, 286, 'CONDOR CORP SE ROBÓ TODOS LOS TOKENS. ¡A RECUPERARLOS!', 15, 10, YL);
   G.ic = ut(W / 2, 318, '>>> INSERT COIN <<<', 22, 10, YL);
   G.st = ut(W / 2, 346, 'PRESIONA START', 22);
   // Heroes stand on the wet street under their name badges.
   G.hs = HER.map((h, i) => {
-    const x = 160 + i * 160;
+    let x = 160 + i * 160;
     ui(AD.image(x, 384, 'nb' + i), 10);
     return [ui(hum(x, 550, 'h' + i + '_i0').setScale(1.6), 10)];
   });
@@ -727,9 +729,9 @@ const title = () => {
   playSong(SONG.t);
 }
 // Controls line, shown on the select screen and at the start of stage 1.
-const HELP = 'B1 GOLPE · MANTÉN B1: BLOQUEO · B2 SALTO · B3 HACKEO';
-const SHOW = ['i0', 'i1', 'i0', 'i1', 'p1', 'p2', 'k', 'i0', 's', 's', 'i1', 'i0'];
-const upTitle = (dt, now) => {
+let HELP = 'B1 GOLPE · MANTÉN B1: BLOQUEO · B2 SALTO · B3 HACKEO';
+let SHOW = ['i0', 'i1', 'i0', 'i1', 'p1', 'p2', 'k', 'i0', 's', 's', 'i1', 'i0'];
+let upTitle = (dt, now) => {
   G.tx = (G.tx || 0) + dt * 1.2; scrollBg(G.tx);
   G.st.setAlpha((now / 450 | 0) % 2 ? 1 : 0.25); G.ic.setAlpha((now / 450 | 0) % 2 ? 0.35 : 1);
   FE(G.hs, (a, i) => FE(a, (s) => s.setTexture('h' + i + '_' + SHOW[((now / 300 | 0) + i * 3) % 12])));
@@ -739,7 +741,7 @@ const upTitle = (dt, now) => {
 }
 // Attract demo: two bots play a random stage, starting at its first wave, for 25 s.
 function demo() {
-  const a = RND() * 4 | 0;
+  let a = RND() * 4 | 0;
   P = [newP(0, a), newP(1, (a + 1 + RND() * 3) % 4 | 0)];
   stage(RND() * 6 | 0);
   DM = tn() + 25000; KY = 0;
@@ -747,26 +749,26 @@ function demo() {
   ut(W / 2, 100, 'DEMO · PRESIONA START', 16, 6000, YL);
 }
 // Demo bot: walk to the nearest foe, line up and punch (special when HACK allows).
-const bot = (p, now) => {
-  const e = nearE(p, 1e9);
-  const k = (c, v) => { held[p.pre + c] = v; }, dx = e ? e.x - p.x : 99, dy = e ? e.y - p.y : 0, go = ABS(dx) > 46;
-  const hit = e && !go && ABS(dy) < 14 && (now / 60 | 0) % 2;
+let bot = (p, now) => {
+  let e = nearE(p, 1e9);
+  let k = (c, v) => { held[p.pre + c] = v; }, dx = e ? e.x - p.x : 99, dy = e ? e.y - p.y : 0, go = ABS(dx) > 46;
+  let hit = e && !go && ABS(dy) < 14 && (now / 60 | 0) % 2;
   k('R', dx > 0 && (go || p.f < 0)); k('L', dx < 0 && (go || p.f > 0));
   k('D', dy > 6); k('U', dy < -6);
   k(1, hit && p.hk < 50); k(3, hit && p.hk > 49);
 }
 
 // ---------- Character select ----------
-const sel = (pi) => {
+let sel = (pi) => {
   clearAll(); MODE = 's'; SFX_pk();
   L = bgSet(0);
   dim(0.6);
   ut(W / 2, 48, 'ELIGE TU HACKER', 34, 10, YL);
   G.j = [pi === 0, pi === 1]; G.cu = [0, 3]; G.lk = [-1, -1]; G.go = 0;
   G.cards = HER.map((h, i) => {
-    const x = 130 + i * 180;
-    const g = ui(AD.graphics(), 9);
-    const im = ui(hum(x, 330, 'h' + i + '_i0').setScale(1.6), 11);
+    let x = 130 + i * 180;
+    let g = ui(AD.graphics(), 9);
+    let im = ui(hum(x, 330, 'h' + i + '_i0').setScale(1.6), 11);
     ui(AD.image(x, 356, 'nb' + i), 11);
     ut(x, 386, h.d, 11, 11, css(h.c));
     FE(['VEL', 'FUERZA', 'HACK'], (l, k) => {
@@ -782,10 +784,10 @@ const sel = (pi) => {
   ut(W / 2, 568, HELP, 12, 10, YL);
   logoBadge(740, 50, 0.4);
 }
-const upSel = (dt, now) => {
+let upSel = (dt, now) => {
   G.tx = (G.tx || 0) + dt * 0.6; scrollBg(G.tx);
   for (let pi = 0; pi < 2; pi++) {
-    const pre = 'P' + (pi + 1) + '_', o = G.lk[1 - pi];
+    let pre = 'P' + (pi + 1) + '_', o = G.lk[1 - pi];
     if (!G.j[pi]) {
       if (tap('START' + (pi + 1))) { G.j[pi] = true; G.go = 0; G.cu[pi] = [0, 1, 2, 3].find((i) => i !== o); SFX_sel(); }
       continue;
@@ -796,12 +798,12 @@ const upSel = (dt, now) => {
     if ((btn(pre, 1) || tap('START' + (pi + 1))) && G.cu[pi] !== o) { G.lk[pi] = G.cu[pi]; SFX_pk(); }
   }
   FE(G.cards, (c, i) => {
-    const l = G.lk.indexOf(i), cu = [0, 1].filter((pi) => G.j[pi] && G.cu[pi] === i);
+    let l = G.lk.indexOf(i), cu = [0, 1].filter((pi) => G.j[pi] && G.cu[pi] === i);
     c.g.clear().fillStyle(0x120c22, 0.9).fillRect(c.x - 82, 160, 164, 330);
     c.g.lineStyle(l >= 0 ? 5 : 2, l === 0 ? 0xff3ca6 : l === 1 ? 0x40e0ff : cu.length ? 0xffffff : 0x3a3450).strokeRect(c.x - 82, 160, 164, 330);
     c.im.setTexture('h' + i + '_' + (l >= 0 ? 's' : SHOW[((now / 300 | 0) + i * 3) % 12]));
   });
-  FE([0, 1], (pi) => { const t = G.tags[pi]; t.setVisible(G.j[pi]); t.setPosition(G.cards[G.cu[pi]].x + (pi ? 30 : -30), 176); });
+  FE([0, 1], (pi) => { let t = G.tags[pi]; t.setVisible(G.j[pi]); t.setPosition(G.cards[G.cu[pi]].x + (pi ? 30 : -30), 176); });
   G.jn.setText(G.j[0] && G.j[1] ? '' : (G.j[0] ? 'P2' : 'P1') + ': PRESIONA START PARA UNIRTE').setAlpha((now / 400 | 0) % 2 ? 1 : 0.3);
   if (!G.go && [0, 1].every((pi) => !G.j[pi] || G.lk[pi] >= 0)) G.go = now + 700;
   if (G.go && now > G.go) {
@@ -812,18 +814,18 @@ const upSel = (dt, now) => {
 }
 
 // ---------- Players ----------
-const newP = (pi, hi) => {
+let newP = (pi, hi) => {
   return { pi, hi, h: HER[hi], k: 'h' + hi, pre: 'P' + (pi + 1) + '_', hp: 100, lives: 3, sc: 0, hk: 30, st: 'i', t: 0, cb: 0, lt: 0, f: 1, fl: 0, inv: 0, hitd: new Set(), x: 0, y: 0, z: 0, vz: 0 };
 }
-const spawnP = (p, x) => {
+let spawnP = (p, x) => {
   p.s = hum(x, 0, p.k + '_i0');
   p.sd = AD.ellipse(x, 0, 46, 12, 0, 0.35).setDepth(390);
   Object.assign(p, { x, y: 470 + p.pi * 50, z: 380, vz: 0, f: 1, inv: 1500 });
   setSt(p, 'j');
 }
-const setSt = (p, s) => { p.st = s; p.t = 0; p.hd = 0; }
-const join = (pi) => {
-  const o = P[1 - pi], prev = P[pi];
+let setSt = (p, s) => { p.st = s; p.t = 0; p.hd = 0; }
+let join = (pi) => {
+  let o = P[1 - pi], prev = P[pi];
   let hi = prev ? prev.hi : pi;
   if (o && o.hi === hi) hi = [0, 1, 2, 3].find((i) => i !== o.hi);
   if (prev && prev.s) { prev.s.destroy(); prev.sd.destroy(); }
@@ -834,19 +836,19 @@ const join = (pi) => {
   pop(camX() + W / 2, 260, 'P' + (pi + 1) + ': ' + HER[hi].n + ' SE UNE', css(HER[hi].c), 22);
   SFX_pk();
 }
-const reach = (p, e, r) => {
-  const dx = (e.x - p.x) * p.f;
+let reach = (p, e, r) => {
+  let dx = (e.x - p.x) * p.f;
   return !e.dead && !e.rm && dx > -12 && dx < r + e.w && ABS(e.y - p.y) < 24 && e.z < 70;
 }
-const strike = (p, mult, kn, r) => { FE(E, (e) => { if (reach(p, e, r)) hurtE(e, p.h.pw * mult, kn, p); }); }
-const special = (p) => {
+let strike = (p, mult, kn, r) => { FE(E, (e) => { if (reach(p, e, r)) hurtE(e, p.h.pw * mult, kn, p); }); }
+let special = (p) => {
   if (p.hk < 50) { pop(p.x, p.y - 110, 'FALTA HACK', '#99a'); SFX_bz(); return; }
   p.hk -= 50; setSt(p, 'x'); p.hitd.clear(); SFX_zap();
   pop(p.x, p.y - 120, p.h.cry, css(p.h.c), 22);
   CM.flash(120, p.h.c >> 16, p.h.c >> 8 & 255, p.h.c & 255);
-  const x = p.h.x;
+  let x = p.h.x;
   if (x === 'drone') AL.push({ ow: p, x: p.x, y: p.y, z: 90, life: 7000, cd: 0, s: AD.image(p.x, p.y, 'dr0').setOrigin(0.5, 1).setTint(0xffa040) });
-  if (x === 'holo') { const o = proj(p.x + p.f * 30, p.y, 0, p.f * 9, 'p', 26, 1, 20, 110, 0x9b5cff); o.ow = p; o.life = 1000; }
+  if (x === 'holo') { let o = proj(p.x + p.f * 30, p.y, 0, p.f * 9, 'p', 26, 1, 20, 110, 0x9b5cff); o.ow = p; o.life = 1000; }
   if (x === 'emp') {
     ring(p.x, p.y, 200, p.h.c);
     FE(E, (e) => {
@@ -856,10 +858,10 @@ const special = (p) => {
     });
   }
 }
-const upP = (p, dt, now) => {
+let upP = (p, dt, now) => {
   if (p.st === 'o') return;
-  const ms = dt * 16.67, pre = p.pre;
-  const mx = (held[pre + 'R'] ? 1 : 0) - (held[pre + 'L'] ? 1 : 0), my = (held[pre + 'D'] ? 1 : 0) - (held[pre + 'U'] ? 1 : 0);
+  let ms = dt * 16.67, pre = p.pre;
+  let mx = (held[pre + 'R'] ? 1 : 0) - (held[pre + 'L'] ? 1 : 0), my = (held[pre + 'D'] ? 1 : 0) - (held[pre + 'U'] ? 1 : 0);
   p.t += ms; if (p.inv > 0) p.inv -= ms; if (p.fl > 0) p.fl -= ms;
   if (p.z > 0 || p.vz > 0) {
     // Heavier gravity on the way down: same jump height, snappier landing.
@@ -871,7 +873,7 @@ const upP = (p, dt, now) => {
       if (p.st === 'd') { p.t = 0; SFX_thud(); dust(p.x, p.y, 4); }
     }
   }
-  const s = p.st;
+  let s = p.st;
   if (s === 'i' || s === 'w') {
     if (mx) p.f = mx;
     // Providencia's wet floor keeps momentum, so players slide when they stop or turn.
@@ -884,7 +886,7 @@ const upP = (p, dt, now) => {
     else if (held[pre + 1] || held[pre + 4]) setSt(p, 'b');
   } else if (s === 'b') { if (!held[pre + 1] && !held[pre + 4]) setSt(p, 'i'); }
   else if (s === 'a') {
-    const fin = p.cb === 3;
+    let fin = p.cb === 3;
     if (p.t > 60 && !p.hd) { p.hd = 1; strike(p, fin ? 1.7 : 1, fin, p.h.rg + (fin ? 14 : 0)); }
     if (p.t > (fin ? 320 : 190)) setSt(p, 'i');
   } else if (s === 'j' || s === 'jk') {
@@ -896,7 +898,7 @@ const upP = (p, dt, now) => {
   // Co-op rescue: a KO'd hero waits up to 4.5 s; a partner standing beside them for 0.5 s gets them back up.
   else if (s === 'd') {
     if (p.z <= 0 && p.t > 850) {
-      const m = P.find((q) => q !== p && live(q) && q.hp > 0);
+      let m = P.find((q) => q !== p && live(q) && q.hp > 0);
       if (p.hp > 0) { setSt(p, 'i'); p.inv = 1000; }
       else if (!m || p.t > 4500) loseLife(p);
       else if (ABS(m.x - p.x) < 60 && ABS(m.y - p.y) < 30) { if ((p.rv = (p.rv || 0) + ms) > 500) { p.rv = 0; p.hp = 40; setSt(p, 'i'); p.inv = 1500; pop(p.x, p.y - 100, '¡ARRIBA!', css(p.h.c), 20); SFX_pk(); } }
@@ -911,11 +913,11 @@ const upP = (p, dt, now) => {
     }
     if (p.t > 360) setSt(p, 'i');
   }
-  const c = camX();
+  let c = camX();
   p.x = cl(p.x, c + 26, c + W - 26); p.y = cl(p.y, FLOOR + 10, H - 12);
 }
 // ub: unblockable (shockwaves, stage hazards).
-const hurtP = (p, d, kn, fx, ub) => {
+let hurtP = (p, d, kn, fx, ub) => {
   if (p.st === 'o' || p.st === 'd' || p.inv > 0 || (p.st === 'x' && p.h.x === 'dash')) return;
   // Guarding a frontal hit: only chip damage, a small push and a clank.
   if (p.st === 'b' && !ub && (fx - p.x) * p.f > 0) { p.hp = MX(1, p.hp - d / 6); p.x -= p.f * 8; squ(p, 0.1); spark(p.x + p.f * 14, p.y - 60, 0x80e0ff); SFX_blk(); return; }
@@ -923,7 +925,7 @@ const hurtP = (p, d, kn, fx, ub) => {
   if (p.hp <= 0 || kn) { setSt(p, 'd'); p.vz = 6.5; p.z = MX(p.z, 0.1); p.kx = (p.x > fx ? 1 : -1) * 4; p.f = p.kx > 0 ? -1 : 1; }
   else { setSt(p, 'h'); p.inv = 450; }
 }
-const loseLife = (p) => {
+let loseLife = (p) => {
   // Demo bots never run out of lives (no game over or records from the attract mode).
   p.lives -= !DM;
   if (p.lives > 0) {
@@ -935,8 +937,8 @@ const loseLife = (p) => {
     pop(p.x, p.y - 80, 'FUERA', '#f44', 22);
   }
 }
-const pfr = (p, now) => {
-  const s = p.st;
+let pfr = (p, now) => {
+  let s = p.st;
   if (s === 'w') return 'w' + (now / 110 | 0) % 4;
   if (s === 'a') return p.cb === 3 ? 'k' : p.cb === 2 ? 'p2' : 'p1';
   if (s === 'j' || s === 'jk') return s === 'jk' ? 'jk' : 'j';
@@ -949,11 +951,11 @@ const pfr = (p, now) => {
 // ---------- Enemies ----------
 // Actor states: i idle, w walk, a attack, j jump, jk jump-kick, h hurt, d down, x special, o out,
 // n wind-up, s shoot, c charge, C charge wind-up, m summon, t stomp, u stun.
-const es = (e, s) => { e.st = s; e.tm = 0; e.hd = 0; e.ld = 0; e.hit = new Set(); };
+let es = (e, s) => { e.st = s; e.tm = 0; e.hd = 0; e.ld = 0; e.hit = new Set(); };
 // Stage ramp, stage 6 vs stage 1: grunt HP x1.4, damage x1.25, wind-up 330 -> 270 ms, cooldown x0.75.
-const spawnE = (t, side) => {
-  const c = camX(), d = ED[t] || {}, k = 1 + st.i * 0.08, sprite = t === 'dr' || t === 'dg' || t === 'cd';
-  const e = {
+let spawnE = (t, side) => {
+  let c = camX(), d = ED[t] || {}, k = 1 + st.i * 0.08, sprite = t === 'dr' || t === 'dg' || t === 'cd';
+  let e = {
     t, x: side > 0 ? c + W + 60 : c - 60, y: 410 + RND() * 160, z: t === 'dr' ? 140 : 0, vz: 0, f: -side,
     hp: (d.hp || 1) * k, sp: d.sp || 1.7, dm: (d.dm || 10) * (1 + st.i * 0.05), sc: d.sc || 100,
     st: 'w', tm: 0, cd: 600 + RND() * 900, yo: RND() * 40 - 20, w: 18, fl: 0, mv: 0, hit: new Set(),
@@ -964,29 +966,29 @@ const spawnE = (t, side) => {
   E.push(e);
   return e;
 }
-const near = (e) => {
+let near = (e) => {
   let b = null, bd = 1e9;
-  FE(P, (p) => { if (live(p) && p.s) { const d = ABS(p.x - e.x) + ABS(p.y - e.y) * 2; if (d < bd) { bd = d; b = p; } } });
+  FE(P, (p) => { if (live(p) && p.s) { let d = ABS(p.x - e.x) + ABS(p.y - e.y) * 2; if (d < bd) { bd = d; b = p; } } });
   return b;
 }
-const hitP = (e, r, dm, kn) => {
+let hitP = (e, r, dm, kn) => {
   FE(P, (p) => {
     if (!p || p.st === 'o') return;
-    const dx = (p.x - e.x) * e.f;
+    let dx = (p.x - e.x) * e.f;
     if (dx > -10 && dx < r && ABS(p.y - e.y) < 18 + (e.boss ? 8 : 0) && p.z < 45) hurtP(p, dm, kn, e.x);
   });
 }
 // X of a slot `gap` px in front of the target. Once inside that gap an enemy holds its x
 // (it only lines up in y), so it never backs away while a player walks in to hit it.
-const slotX = (e, tg, gap) => (ABS(tg.x - e.x) > gap ? tg.x - e.f * gap : e.x);
-const moveTo = (e, gx, gy, dt) => {
-  const dx = gx - e.x, dy = gy - e.y, m = HYP(dx, dy);
+let slotX = (e, tg, gap) => (ABS(tg.x - e.x) > gap ? tg.x - e.f * gap : e.x);
+let moveTo = (e, gx, gy, dt) => {
+  let dx = gx - e.x, dy = gy - e.y, m = HYP(dx, dy);
   e.mv = m > 5;
   if (e.mv) { e.x += dx / m * e.sp * dt; e.y += dy / m * e.sp * 0.7 * dt; }
 }
-const hurtE = (e, d, kn, by, quiet) => {
+let hurtE = (e, d, kn, by, quiet) => {
   if (e.dead || e.rm) return;
-  const n = tn();
+  let n = tn();
   e.hp -= d; e.fl = 80; e.hb = n + 1500; squ(e, e.boss ? 0.08 : 0.2);
   spark(e.x - (by ? by.f : 0) * 8, e.y - e.z - (e.t === 'dr' ? 14 : e.bx ? 20 : 50), by ? by.h.c : 0xffffff);
   // Combo: hits within 1.5 s chain; each hit scores 10 x chain (capped at 10x).
@@ -1005,14 +1007,14 @@ const hurtE = (e, d, kn, by, quiet) => {
   } else { es(e, 'h'); e.x += by && e.x > by.x ? 5 : -5; }
 }
 // The stolen tokens: they burst out of every KO, fly to nearby players and refill HACK.
-const coins = (x, y, n) => rp(n, () => IT.push({ x: x + RND() * 70 - 35, y: cl(y + RND() * 36 - 18, FLOOR + 10, H - 12), k: 4, t: 0, s: AD.image(x, y, 'it4').setOrigin(0.5, 1) }));
-const drop = (e, force) => {
+let coins = (x, y, n) => rp(n, () => IT.push({ x: x + RND() * 70 - 35, y: cl(y + RND() * 36 - 18, FLOOR + 10, H - 12), k: 4, t: 0, s: AD.image(x, y, 'it4').setOrigin(0.5, 1) }));
+let drop = (e, force) => {
   if (!force && RND() > 0.1) return;
-  const r = RND(), k = force ? (r < 0.45 ? 0 : r < 0.72 ? 2 : r < 0.88 ? 1 : 3) : (r < 0.5 ? 1 : 0);
+  let r = RND(), k = force ? (r < 0.45 ? 0 : r < 0.72 ? 2 : r < 0.88 ? 1 : 3) : (r < 0.5 ? 1 : 0);
   IT.push({ x: e.x, y: e.y, k, t: 0, s: AD.image(e.x, e.y, 'it' + k).setOrigin(0.5, 1) });
 }
-const upE = (e, dt, now) => {
-  const ms = dt * 16.67;
+let upE = (e, dt, now) => {
+  let ms = dt * 16.67;
   e.tm += ms; e.cd -= ms; if (e.fl > 0) e.fl -= ms;
   if (e.bx) return;
   if (e.dead) { e.s.setAlpha((now / 60 | 0) % 2 ? 0.25 : 1); if (e.tm > (e.boss ? 1700 : 700)) e.rm = 1; return; }
@@ -1020,7 +1022,7 @@ const upE = (e, dt, now) => {
     if (e.z > 0 || e.vz > 0) {
       e.z += e.vz * dt; e.vz -= 0.5 * dt; e.x += e.kx * dt;
       // Thrown bodies rebound off the screen edges so they stay in play.
-      const c = camX();
+      let c = camX();
       if ((e.x < c + 24 && e.kx < 0) || (e.x > c + W - 24 && e.kx > 0)) { e.kx *= -0.6; shake(60, 0.004); dust(e.x, e.y - e.z, 3); }
       if (e.z <= 0) {
         SFX_thud(); dust(e.x, e.y, 4);
@@ -1033,7 +1035,7 @@ const upE = (e, dt, now) => {
   }
   if (e.st === 'h') { if (e.tm > 250) es(e, 'w'); return; }
   if (e.st === 'u') { if (now % 200 < 20) spark(e.x, e.y - 90, 0x39ff6a); if (e.tm > 1500) es(e, 'w'); return; }
-  const tg = near(e);
+  let tg = near(e);
   if (!tg) { e.mv = 0; return; }
   if (e.boss) upBoss(e, dt, tg);
   else if (e.t === 'dr') upDr(e, dt, tg, now);
@@ -1042,9 +1044,9 @@ const upE = (e, dt, now) => {
   e.y = cl(e.y, FLOOR + 10, H - 12);
 }
 // Attack slots: two grunts may wind up at once (three from stage 4), so crowds stay fair.
-const free = () => E.filter((e) => !e.boss && (e.st === 'n' || e.st === 'a' || e.st === 'c')).length < 2 + (st.i > 2);
-const upHum = (e, dt, tg) => {
-  const dx = tg.x - e.x, dy = tg.y - e.y;
+let free = () => E.filter((e) => !e.boss && (e.st === 'n' || e.st === 'a' || e.st === 'c')).length < 2 + (st.i > 2);
+let upHum = (e, dt, tg) => {
+  let dx = tg.x - e.x, dy = tg.y - e.y;
   if (e.st === 'w') {
     e.f = dx > 0 ? 1 : -1;
     moveTo(e, slotX(e, tg, 44), tg.y + e.yo * 0.3, dt);
@@ -1060,16 +1062,16 @@ const upHum = (e, dt, tg) => {
     if (e.tm > 450) { es(e, 'w'); e.cd = 2000; }
   }
 }
-const upDr = (e, dt, tg, now) => {
+let upDr = (e, dt, tg, now) => {
   e.z += (42 + SIN(now / 200 + e.yo) * 6 - e.z) * 0.05 * dt;
   e.f = tg.x > e.x ? 1 : -1;
   // Keep the hover point on screen so drones never shoot from off-camera.
-  const c = camX(), gx = cl(slotX(e, tg, 170), c + 30, c + W - 30);
+  let c = camX(), gx = cl(slotX(e, tg, 170), c + 30, c + W - 30);
   e.x += cl(gx - e.x, -e.sp * dt, e.sp * dt); e.y += cl(tg.y - e.y, -1.5 * dt, 1.5 * dt);
   if (e.cd <= 0 && ABS(tg.y - e.y) < 18) { proj(e.x + e.f * 16, e.y, e.z, e.f * 6, 'e', e.dm, 0, 10, 5, 0xff3040); SFX_bz(); e.cd = 1800 + RND() * 900; }
 }
-const upDg = (e, dt, tg) => {
-  const dx = tg.x - e.x, dy = tg.y - e.y;
+let upDg = (e, dt, tg) => {
+  let dx = tg.x - e.x, dy = tg.y - e.y;
   if (e.st === 'w') {
     e.f = dx > 0 ? 1 : -1;
     moveTo(e, slotX(e, tg, 210), tg.y, dt);
@@ -1081,17 +1083,17 @@ const upDg = (e, dt, tg) => {
     if (e.tm > 520) { es(e, 'w'); e.cd = 1600 + RND() * 1000; }
   }
 }
-const upBoss = (e, dt, tg) => {
-  const dx = tg.x - e.x, dy = tg.y - e.y, sc = e.bs;
+let upBoss = (e, dt, tg) => {
+  let dx = tg.x - e.x, dy = tg.y - e.y, sc = e.bs;
   switch (e.st) {
     case 'w':
       if (e.z > 0) e.z = MX(0, e.z - 3 * dt);
       e.f = dx > 0 ? 1 : -1;
       moveTo(e, slotX(e, tg, 45 * sc), tg.y, dt);
       if (e.cd <= 0) {
-        const close = ABS(dx) < 80 * sc && ABS(dy) < 22, mo = e.mo.replace('p', '') || 'p';
+        let close = ABS(dx) < 80 * sc && ABS(dy) < 22, mo = e.mo.replace('p', '') || 'p';
         // Up close: punch half the time, otherwise any other move, so each boss shows its whole set.
-        const m = close && e.mo.includes('p') && RND() < 0.5 ? 'p' : mo[RND() * mo.length | 0];
+        let m = close && e.mo.includes('p') && RND() < 0.5 ? 'p' : mo[RND() * mo.length | 0];
         es(e, { p: 'n', c: 'C', s: 's', m: 'm', t: 't', h: 'z' }[m]);
       }
       break;
@@ -1104,7 +1106,7 @@ const upBoss = (e, dt, tg) => {
     case 'c': {
       e.x += e.f * 9 * dt; if (e.t === 'cd') e.z = 40;
       FE(P, (p) => { if (live(p) && !e.hit.has(p) && ABS(p.x - e.x) < 40 * sc && ABS(p.y - e.y) < 24) { e.hit.add(p); hurtP(p, e.dm, 1, e.x - e.f); } });
-      const c = camX();
+      let c = camX();
       if (e.tm > 900 || e.x < c + 40 || e.x > c + W - 40) { e.x = cl(e.x, c + 40, c + W - 40); e.z = 0; es(e, 'w'); e.cd = 900; }
       break;
     }
@@ -1115,7 +1117,7 @@ const upBoss = (e, dt, tg) => {
       break;
     case 'z':
       e.mv = 0;
-      if (!e.hd && e.tm > 250) { e.hd = 1; const p = tgt(); if (p && HZ[st.i]) HZ[st.i](p); }
+      if (!e.hd && e.tm > 250) { e.hd = 1; let p = tgt(); if (p && HZ[st.i]) HZ[st.i](p); }
       if (e.tm > 700) { es(e, 'w'); e.cd = 1000; }
       break;
     case 'm':
@@ -1135,14 +1137,14 @@ const upBoss = (e, dt, tg) => {
       break;
     default: es(e, 'w');
   }
-  const c = camX(); e.x = cl(e.x, c + 30, c + W - 30);
+  let c = camX(); e.x = cl(e.x, c + 30, c + W - 30);
 }
-const efr = (e, now) => {
+let efr = (e, now) => {
   if (e.bx) return 'bx' + e.v;
   if (e.t === 'dr') return 'dr' + (now / 50 | 0) % 2;
   if (e.t === 'dg') return 'dg' + (e.st === 'c' || e.st === 'n' ? 2 : e.mv ? (now / 110 | 0) % 2 : 0);
   if (e.t === 'cd') return 'cd' + (now / (e.st === 'c' ? 90 : 220) | 0) % 2;
-  const k = e.t + '_', s = e.st;
+  let k = e.t + '_', s = e.st;
   if (e.dead || s === 'h' || s === 'd' || s === 'u') return k + 'h';
   if (s === 'n') return k + 'p2';
   if (s === 'a') return k + (e.t === 'tk' ? 'k' : 'p1');
@@ -1151,10 +1153,10 @@ const efr = (e, now) => {
   if (s === 't') return k + (e.z > 0 ? 'j' : 'i0');
   return k + (e.mv ? 'w' + (now / 140 | 0) % 4 : 'i' + (now / 420 | 0) % 2);
 }
-const drawE = (e, fr, pl) => {
-  const s = e.s;
+let drawE = (e, fr, pl) => {
+  let s = e.s;
   s.setTexture(fr).setPosition(e.x, e.y - e.z).setDepth(e.y + (e.boss ? 1 : 0));
-  const q = e.sq ? e.sq * MX(0, 1 - (tn() - e.sqT) / 180) : 0, k = e.bs || 1;
+  let q = e.sq ? e.sq * MX(0, 1 - (tn() - e.sqT) / 180) : 0, k = e.bs || 1;
   s.setScale(k * (1 + q), k * (1 - q));
   s.flipX = e.f < 0;
   // Knocked bodies tumble back 35° in flight, then lie flat from the first landing on.
@@ -1165,9 +1167,9 @@ const drawE = (e, fr, pl) => {
 }
 
 // ---------- Bosses ----------
-const spawnBoss = () => {
-  const b = st.d.b, n = P.filter((p) => live(p)).length;
-  const e = spawnE(b[1], 1);
+let spawnBoss = () => {
+  let b = st.d.b, n = P.filter((p) => live(p)).length;
+  let e = spawnE(b[1], 1);
   Object.assign(e, { boss: 1, nm: b[0], mo: b[4], hp: b[3] * (n > 1 ? 1.5 : 1), sc: 3000, dm: 14 + st.i * 2, sp: 1.7, w: 30, cd: 1500 });
   e.mhp = e.hp; e.bs = b[2];
   if (b[1] === 'cd') { e.z = 220; e.x = camX() + W - 160; e.vz = 0; }
@@ -1189,13 +1191,13 @@ function bossDie(e) {
 }
 
 // ---------- Projectiles, allies, items ----------
-const proj = (x, y, z, vx, o, dm, kn, w, h, col) => {
-  const p = { x, y, z, vx, o, dm, kn, w, life: 2500, hit: new Set(), s: AD.rectangle(x, y - z, w * 2, h, col, o === 'p' ? 0.55 : 1).setOrigin(0.5, 1) };
+let proj = (x, y, z, vx, o, dm, kn, w, h, col) => {
+  let p = { x, y, z, vx, o, dm, kn, w, life: 2500, hit: new Set(), s: AD.rectangle(x, y - z, w * 2, h, col, o === 'p' ? 0.55 : 1).setOrigin(0.5, 1) };
   if (o === 'p') p.s.setStrokeStyle(3, 0xe0c8ff);
   PR.push(p);
   return p;
 }
-const upPR = (o, dt) => {
+let upPR = (o, dt) => {
   o.x += o.vx * dt; o.life -= dt * 16.67;
   o.s.setPosition(o.x, o.y - o.z).setDepth(o.y);
   if (o.o === 'e') {
@@ -1208,33 +1210,33 @@ const upPR = (o, dt) => {
   }
 }
 // Nearest standing foe within r of o (the drone ally and the demo bot).
-const nearE = (o, r) => {
+let nearE = (o, r) => {
   let b = null, bd = r;
-  FE(E, (e) => { if (!e.dead && !e.bx) { const d = HYP(e.x - o.x, e.y - o.y); if (d < bd) { bd = d; b = e; } } });
+  FE(E, (e) => { if (!e.dead && !e.bx) { let d = HYP(e.x - o.x, e.y - o.y); if (d < bd) { bd = d; b = e; } } });
   return b;
 }
-const upAL = (a, dt, now) => {
-  const o = a.ow, ms = dt * 16.67;
+let upAL = (a, dt, now) => {
+  let o = a.ow, ms = dt * 16.67;
   a.life -= ms; a.cd -= ms;
   a.x += (o.x - o.f * 34 - a.x) * 0.1 * dt; a.y += (o.y - 4 - a.y) * 0.1 * dt; a.z = 80 + SIN(now / 150) * 6;
   if (a.cd <= 0) {
-    const b = nearE(a, 300);
+    let b = nearE(a, 300);
     if (b) { zap(a.x, a.y - a.z, b.x, b.y - b.z - 40, 0xffa040); hurtE(b, 9, 0, o, 1); a.cd = 450; }
   }
   a.s.setTexture('dr' + (now / 50 | 0) % 2).setPosition(a.x, a.y - a.z).setDepth(a.y);
 }
-const upIT = (i, dt, now) => {
+let upIT = (i, dt, now) => {
   i.t += dt * 16.67;
   // Tokens fly to a live player within ~110 px.
-  if (i.k > 3) { const p = P.find((q) => live(q) && ABS(q.x - i.x) + ABS(q.y - i.y) < 110); if (p) { i.x += (p.x - i.x) * 0.15 * dt; i.y += (p.y - i.y) * 0.15 * dt; } }
+  if (i.k > 3) { let p = P.find((q) => live(q) && ABS(q.x - i.x) + ABS(q.y - i.y) < 110); if (p) { i.x += (p.x - i.x) * 0.15 * dt; i.y += (p.y - i.y) * 0.15 * dt; } }
   i.s.setPosition(i.x, i.y - 4 - ABS(SIN(now / 200)) * 6).setDepth(i.y);
   if (i.t > 9000) i.s.setVisible((now / 80 | 0) % 2 === 0);
   if (i.t > 12000) i.rm = 1;
-  for (const p of P) {
+  for (let p of P) {
     if (live(p) && p.st !== 'd' && ABS(p.x - i.x) < 32 && ABS(p.y - i.y) < 20 && p.z < 20) { take(p, i.k); i.rm = 1; break; }
   }
 }
-const take = (p, k) => {
+let take = (p, k) => {
   if (k > 3) { p.sc += 50; p.hk = MN(100, p.hk + 4); st.tk[p.pi]++; SFX_tk(); return; }
   if (k === 0) p.hp = MN(100, p.hp + 35);
   if (k === 1) p.hk = 100;
@@ -1243,35 +1245,35 @@ const take = (p, k) => {
   pop(p.x, p.y - 110, ITEMS[k][0], ITEMS[k][1], 18);
   SFX_pk();
 }
-const cull = () => {
-  const c = camX();
-  const f = (a) => a.filter((o) => {
-    const d = o.rm || o.life <= 0 || (o.vx && (o.x < c - 120 || o.x > c + W + 120));
+let cull = () => {
+  let c = camX();
+  let f = (a) => a.filter((o) => {
+    let d = o.rm || o.life <= 0 || (o.vx && (o.x < c - 120 || o.x > c + W + 120));
     if (d) { o.s.destroy(); if (o.sd) o.sd.destroy(); }
     return !d;
   });
   E = f(E); PR = f(PR); IT = f(IT); AL = f(AL);
 }
-const sep = (dt) => {
+let sep = (dt) => {
   for (let i = 0; i < E.length; i++) for (let j = i + 1; j < E.length; j++) {
-    const a = E[i], b = E[j];
+    let a = E[i], b = E[j];
     if (a.bx || b.bx || a.dead || b.dead || a.t === 'dr' || b.t === 'dr') continue;
-    const dx = b.x - a.x, dy = b.y - a.y;
+    let dx = b.x - a.x, dy = b.y - a.y;
     // Scaled by dt so the crowd push is the same at 60, 120 or 180 fps.
-    if (ABS(dx) < 26 && ABS(dy) < 14) { const s = (dx < 0 ? -0.8 : 0.8) * dt, t = (dy < 0 ? -0.5 : 0.5) * dt; a.x -= s; b.x += s; a.y -= t; b.y += t; }
+    if (ABS(dx) < 26 && ABS(dy) < 14) { let s = (dx < 0 ? -0.8 : 0.8) * dt, t = (dy < 0 ? -0.5 : 0.5) * dt; a.x -= s; b.x += s; a.y -= t; b.y += t; }
   }
 }
 
 // ---------- Stages ----------
-const wave = (i, k, n) => {
-  const pool = STG[i].pool.split(','), q = [];
+let wave = (i, k, n) => {
+  let pool = STG[i].pool.split(','), q = [];
   // Waves grow every other stage so the 6-stage run stays near arcade length (~7 min).
   rp(3 + (i >> 1) + k + (n > 1 ? 2 : 0), (j) => { q.push(pool[RND() * pool.length | 0]); });
   return q;
 }
-const stage = (i) => {
+let stage = (i) => {
   clearAll(); clearWorld(); MODE = 'p'; CM.setScroll(0, 0);
-  const d = STG[i], n = P.filter(Boolean).length;
+  let d = STG[i], n = P.filter(Boolean).length;
   // Two waves, then the boss: keeps a full 6-stage clear near arcade length.
   st = { i, d, len: 2800, wv: [650, 1450].map((x, k) => ({ x, q: wave(i, k, n) })), wi: 0, act: 0, q: [], sp: 0, lim: 650, tk: [0, 0] };
   L = bgSet(i);
@@ -1285,7 +1287,7 @@ const stage = (i) => {
   if (i < 2) WO.push(AD.image(560, i ? 138 : 106, 'pb').setOrigin(0.5, 0).setDepth(5));
   FE(d.sg, ([, , x], k) => WO.push(AD.image(x, 430, 'sg' + i + k).setOrigin(0.5, 1).setDepth(6)));
   FE([500, 1250, 1950, 2700], (x, k) => {
-    const e = { bx: 1, v: k % 2, t: 'bx', x, y: 420 + RND() * 120, z: 0, f: 1, hp: 1, w: 16, st: 'i', tm: 0, cd: 0, fl: 0 };
+    let e = { bx: 1, v: k % 2, t: 'bx', x, y: 420 + RND() * 120, z: 0, f: 1, hp: 1, w: 16, st: 'i', tm: 0, cd: 0, fl: 0 };
     e.s = AD.image(x, e.y, 'bx' + e.v).setOrigin(0.5, 1).setDepth(e.y);
     E.push(e);
   });
@@ -1295,7 +1297,7 @@ const stage = (i) => {
   playSong({ ...SONG.g, r: [45, 47, 43, 42, 46, 44][i] });
 }
 // ¡TEMBLOR! Big shake; grounded grunts stagger, the heroes (Chileans) don't even flinch.
-const temblor = () => {
+let temblor = () => {
   if (MODE !== 'p' || st.end) return;
   shake(700, 0.012); SFX_boom();
   pop(camX() + W / 2, 250, '¡TEMBLOR! TRANQUI, ES UN 5,9', YL, 26);
@@ -1304,17 +1306,17 @@ const temblor = () => {
 // ---------- Stage hazards: one new mechanic per stage, telegraphed, then reused by the boss ----------
 // A red mark warns for 0.9 s, then a container/meteor lands (or a laser sweeps the lane) and hits players
 // (unblockable; jump over lasers) and grunts alike.
-const hzd = (x, y, lane) => {
-  const m = (lane ? AD.rectangle(camX() + W / 2, y, W, 8, 0xff2a40, 0.6) : AD.ellipse(x, y, 96, 28, 0xff2a40, 0.45)).setDepth(391);
+let hzd = (x, y, lane) => {
+  let m = (lane ? AD.rectangle(camX() + W / 2, y, W, 8, 0xff2a40, 0.6) : AD.ellipse(x, y, 96, 28, 0xff2a40, 0.45)).setDepth(391);
   tw(m, { alpha: 0.25, yoyo: true, repeat: 2, duration: 150 });
   if (!lane) {
-    const b = AD.image(x, y - 420, st.i === 3 ? 'sp' : 'bx1').setScale(2.4).setOrigin(0.5, 1).setDepth(y).setTint(st.i === 3 ? 0xff7a30 : 0xffffff);
+    let b = AD.image(x, y - 420, st.i === 3 ? 'sp' : 'bx1').setScale(2.4).setOrigin(0.5, 1).setDepth(y).setTint(st.i === 3 ? 0xff7a30 : 0xffffff);
     tw(b, { y, delay: 740, duration: 160 }); fo(b, 300, 1300);
   }
   later(900, () => {
     m.destroy();
     if (MODE !== 'p' || st.end) return;
-    const hit = (o) => o.z < 30 && ABS(o.y - y) < (lane ? 16 : 22) && (lane || ABS(o.x - x) < 52);
+    let hit = (o) => o.z < 30 && ABS(o.y - y) < (lane ? 16 : 22) && (lane || ABS(o.x - x) < 52);
     if (lane) { fo(AD.rectangle(camX() + W / 2, y - 40, W, 12, 0xff3050).setDepth(1990), 350); SFX_zap(); } else boom(x, y - 20);
     shake(150, 0.006);
     FE(P, (p) => { if (live(p) && hit(p)) hurtP(p, 16, 1, x, 1); });
@@ -1322,17 +1324,17 @@ const hzd = (x, y, lane) => {
   });
 };
 // Patagonian wind: 2.5 s gusts push everyone sideways (bosses less).
-const gust = () => { st.wd = RND() < 0.5 ? -2.2 : 2.2; st.wt = tn() + 2500; pop(camX() + W / 2, 250, '¡VIENTO PATAGÓNICO!', '#cef', 22); };
-const tgt = () => { const a = P.filter((p) => live(p) && p.s); return a[RND() * a.length | 0]; };
+let gust = () => { st.wd = RND() < 0.5 ? -2.2 : 2.2; st.wt = tn() + 2500; pop(camX() + W / 2, 250, '¡VIENTO PATAGÓNICO!', '#cef', 22); };
+let tgt = () => { let a = P.filter((p) => live(p) && p.s); return a[RND() * a.length | 0]; };
 // Santiago teaches the basics; Providencia's wet floor is passive (see upP); then containers, meteors, wind, lasers.
-const HZ = [0, 0, (p) => hzd(p.x, p.y), (p) => FE([-1, 0, 1], (k) => hzd(p.x + k * 110, p.y + k * 30)), gust, (p) => hzd(0, p.y, 1)];
-const upCam = (dt, now) => {
-  const al = P.filter((p) => live(p));
-  const lim = st.wi < st.wv.length ? st.wv[st.wi].x : st.len - W;
+let HZ = [0, 0, (p) => hzd(p.x, p.y), (p) => FE([-1, 0, 1], (k) => hzd(p.x + k * 110, p.y + k * 30)), gust, (p) => hzd(0, p.y, 1)];
+let upCam = (dt, now) => {
+  let al = P.filter((p) => live(p));
+  let lim = st.wi < st.wv.length ? st.wv[st.wi].x : st.len - W;
   st.lim = lim;
   let c = camX();
   if (al.length && !st.act) {
-    const ax = al.reduce((a, p) => a + p.x, 0) / al.length, t = MN(ax - W * 0.42, lim);
+    let ax = al.reduce((a, p) => a + p.x, 0) / al.length, t = MN(ax - W * 0.42, lim);
     if (t > c) c = MN(t, c + 5 * dt);
     CM.scrollX = c;
     if (c >= lim - 1) {
@@ -1344,13 +1346,13 @@ const upCam = (dt, now) => {
   if (L.r) L.r.setTilePosition(c + now * 0.18, -now * 0.65);
   if (L.w) L.w.setAlpha(st.wt > now ? 0.7 : 0).tilePositionY += (st.wd || 0) * 9 * dt;
   if (st.act && st.wi < st.wv.length) {
-    const alive = E.filter((e) => !e.bx && !e.dead).length, cap = 3 + al.length + (st.i >> 1);
+    let alive = E.filter((e) => !e.bx && !e.dead).length, cap = 3 + al.length + (st.i >> 1);
     if (st.q.length && alive < cap && now > st.sp) { spawnE(st.q.shift(), RND() < 0.5 ? -1 : 1); st.sp = now + 450; }
     if (!st.q.length && !alive) { st.act = 0; st.wi++; st.gt = now + 3000; }
-    if (HZ[st.i] && now > st.ht) { st.ht = now + 6500 - st.i * 300; const p = tgt(); if (p) HZ[st.i](p); }
+    if (HZ[st.i] && now > st.ht) { st.ht = now + 6500 - st.i * 300; let p = tgt(); if (p) HZ[st.i](p); }
   }
 }
-const upPlay = (dt, now) => {
+let upPlay = (dt, now) => {
   for (let pi = 0; pi < 2; pi++) if (tap('START' + (pi + 1)) && (!P[pi] || P[pi].st === 'o')) join(pi);
   if (st.end) { renderAll(now); drawHud(now); return; }
   if (frz > tn()) { drawHud(now); return; }
@@ -1365,14 +1367,14 @@ const upPlay = (dt, now) => {
   cull();
   renderAll(now); drawHud(now);
   // Arcade continue: 10 s countdown once everyone is out; START (join) cancels it.
-  const out = P.some(Boolean) && P.every((p) => !p || p.st === 'o');
+  let out = P.some(Boolean) && P.every((p) => !p || p.st === 'o');
   if (!out) st.go = 0; else if (!st.go) st.go = now + 9999;
-  const cs = st.go > now ? (st.go - now) / 1000 | 0 : -1;
+  let cs = st.go > now ? (st.go - now) / 1000 | 0 : -1;
   if (cs !== HUD.cv) { HUD.cv = cs; if (cs >= 0) SFX_sel(); }
   HUD.ct.setText('¿CONTINUAR? ' + cs);
   if (st.go && cs < 0) gameOver();
 }
-const renderAll = (now) => {
+let renderAll = (now) => {
   FE(P, (p) => {
     if (!p || p.st === 'o' || !p.s) return;
     drawE(p, p.k + '_' + pfr(p, now), 1);
@@ -1380,7 +1382,7 @@ const renderAll = (now) => {
   });
   FE(E, (e) => drawE(e, efr(e, now)));
 }
-const clearStage = () => {
+let clearStage = () => {
   if (MODE !== 'p') return;
   st.end = 1; playSong(null); SFX_cl();
   FE(P, (p) => { if (live(p)) p.sc += 1000 + (p.hp * 20 | 0); });
@@ -1388,7 +1390,7 @@ const clearStage = () => {
   // Each player's tokens from this stage count up under the banner, one rising tick per step.
   FE(P, (p, k) => {
     if (!live(p)) return;
-    const t = ut(W / 2, 362 + k * 32, '', 20, 4001, css(p.h.c));
+    let t = ut(W / 2, 362 + k * 32, '', 20, 4001, css(p.h.c));
     rp(21, (s) => later(600 + s * 60, () => { t.setText(p.h.n + ': ' + (st.tk[k] * s / 20 | 0) + ' TOKENS'); tone(600 + s * 40, 0.05, SQ, 0.04); }));
   });
   later(4000, () => {
@@ -1401,7 +1403,7 @@ const clearStage = () => {
 function mkHud() {
   HUD = { g: ui(AD.graphics(), 5000), s: [] };
   rp(2, (pi) => {
-    const x = pi ? W - 300 : 10;
+    let x = pi ? W - 300 : 10;
     HUD.s[pi] = {
       x, k: -1,
       im: ui(AD.image(0, 0, 'h0_i0').setOrigin(0), 5001),
@@ -1422,18 +1424,18 @@ function mkHud() {
   HUD.bn = ut(W / 2, 562, '', 14, 5002, WH);
   HUD.go = ut(W - 90, 300, '¡SIGUE! ▶', 24, 5001, YL);
 }
-const drawHud = (now) => {
-  const g = HUD.g;
+let drawHud = (now) => {
+  let g = HUD.g;
   g.clear();
   rp(2, (pi) => {
-    const h = HUD.s[pi], p = P[pi], x = h.x, on = live(p), col = p ? p.h.c : 0x555566;
+    let h = HUD.s[pi], p = P[pi], x = h.x, on = live(p), col = p ? p.h.c : 0x555566;
     g.fillStyle(0x0c0816, 0.85).fillRect(x, 6, 290, 60);
     g.lineStyle(3, on && p.hp < 30 && (now / 200 | 0) % 2 ? 0xff3040 : col).strokeRect(x, 6, 290, 60);
     // Text colors change only with the hero (setColor re-renders the text, so never per frame).
     if (p && h.k !== p.hi) { h.k = p.hi; h.im.setTexture('h' + p.hi + '_i0').setCrop(18, 3, 33, 33).setPosition(x + 8 - 18, 16 - 3); h.n.setColor(css(p.h.c)); h.cb.setColor(css(p.h.c)); }
     h.im.setVisible(!!on); h.n.setVisible(!!on); h.l.setVisible(!!on); h.sc.setVisible(!!p); h.tq.setVisible(!!p); h.m.setVisible(!on);
     // Combo counter pops on each hit and fades out as the chain window closes.
-    const ca = on && p.ch > 1 ? 1500 - now + p.ct : 0;
+    let ca = on && p.ch > 1 ? 1500 - now + p.ct : 0;
     h.cb.setVisible(ca > 0);
     if (ca > 0) h.cb.setText(p.ch + ' HITS!').setScale(1 + MX(0, ca - 1340) / 300).setAlpha(MN(1, ca / 300));
     if (on) {
@@ -1447,7 +1449,7 @@ const drawHud = (now) => {
       if (p) h.sc.setText(String(p.sc).padStart(7, '0'));
     }
   });
-  const b = st.boss;
+  let b = st.boss;
   if (b && !b.dead) {
     g.fillStyle(0x0c0816, 0.85).fillRect(180, 548, 440, 42);
     g.fillStyle(0x2a2838).fillRect(190, 574, 420, 9);
@@ -1457,7 +1459,7 @@ const drawHud = (now) => {
   // Small HP bar over any grunt hit in the last 1.5 s.
   FE(E, (e) => {
     if (e.hb > now && e.mhp && !e.boss && !e.dead) {
-      const x = e.x - camX() - 20, y = e.y - e.z - (e.st === 'd' ? 40 : e.s.displayHeight) - 12;
+      let x = e.x - camX() - 20, y = e.y - e.z - (e.st === 'd' ? 40 : e.s.displayHeight) - 12;
       g.fillStyle(0x120a1a).fillRect(x - 2, y - 2, 44, 8).fillStyle(0xff3040).fillRect(x, y, 40 * MX(0, e.hp) / e.mhp, 4);
     }
   });
@@ -1488,22 +1490,22 @@ function win() {
   playSong(SONG.t); SFX_cl();
   G.wt = tn() + 8000; G.w0 = tn(); G.next = names;
 }
-const upEnd = (dt, now) => {
+let upEnd = (dt, now) => {
   if (L) { G.tx = (G.tx || 0) + dt * 0.5; scrollBg(G.tx); }
   if (now > G.wt || (now > G.w0 + 1500 && (tap('START1') || tap('START2') || btn('P1_', 1) || btn('P2_', 1)))) G.next();
 }
-const names = () => {
+let names = () => {
   G.nq = FIN.filter((f) => f.s > 0).sort((a, b) => b.s - a.s); G.ni = 0;
   nextName();
 }
-const qualifies = (s) => board.length < 8 || s > board[board.length - 1].s;
-const AB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-const nextName = () => {
+let qualifies = (s) => board.length < 8 || s > board[board.length - 1].s;
+let AB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+let nextName = () => {
   while (G.ni < G.nq.length && !qualifies(G.nq[G.ni].s)) G.ni++;
   if (G.ni >= G.nq.length) { showBoard(); return; }
   clearAll(); clearWorld(); MODE = 'n';
   duskBg(); dim(0.55);
-  const f = G.nq[G.ni];
+  let f = G.nq[G.ni];
   G.nm = { f, l: [0, 0, 0], c: 0, rp: 0, t0: tn() };
   ut(W / 2, 110, '¡NUEVO RÉCORD!', 40, 10, YL);
   ut(W / 2, 170, 'JUGADOR ' + (f.pi + 1) + ' · ' + HER[f.h].n, 20, 10, css(HER[f.h].c));
@@ -1514,8 +1516,8 @@ const nextName = () => {
   ut(W / 2, 440, 'ARRIBA/ABAJO: LETRA · B1: SIGUIENTE · START: LISTO', 13, 10, '#aaa');
   logoBadge(W / 2, 520, 0.36);
 }
-const upName = (dt, now) => {
-  const n = G.nm, pre = 'P' + (n.f.pi + 1) + '_', u = held[pre + 'U'], d = held[pre + 'D'];
+let upName = (dt, now) => {
+  let n = G.nm, pre = 'P' + (n.f.pi + 1) + '_', u = held[pre + 'U'], d = held[pre + 'D'];
   // Ignore input carried over from play; auto-accept if the player walked away.
   if (now < n.t0 + 600) return;
   let step = 0;
