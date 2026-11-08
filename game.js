@@ -38,8 +38,12 @@ const CABINET_KEYS = {
 const { abs: ABS, random: RND, min: MN, max: MX, sin: SIN, cos: COS, hypot: HYP, PI } = Math;
 // Shared palette and the square-wave type.
 const YL = '#ffe14a', WH = '#ffffff', CY = '#40e0ff', PK = '#ff3ca6', PL = '#f6b919', DK = '#120a1a', SQ = 'square';
+// Run f(i) for i = 0..n-1.
+const rp = (n, f) => { for (let i = 0; i < n; i++) f(i); };
+// Canvas fill / stroke colour setters (shorter than the property assignments).
+const FS = (c, v) => { c.fillStyle = v; }, SS = (c, v) => { c.strokeStyle = v; };
 // Canvas fill shorthand for the procedural art.
-const FR = (c, col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+const FR = (c, col, x, y, w, h) => { FS(c, col); c.fillRect(x, y, w, h); };
 // Stroked line segment in the current stroke style.
 const LN = (c, x1, y1, x2, y2) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); };
 // Filled circle (rx only) or ellipse in the current fill style.
@@ -92,7 +96,7 @@ const tone = (f, d, ty = SQ, v = 0.08, dl = 0, f2 = 0) => {
 }
 const noise = (d, v = 0.1, dl = 0, hp = 800) => {
   if (!AC || AC.state !== 'running') return;
-  if (!NB) { NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const a = NB.getChannelData(0); for (let i = 0; i < a.length; i++) a[i] = RND() * 2 - 1; }
+  if (!NB) { NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const a = NB.getChannelData(0); rp(a.length, (i) => { a[i] = RND() * 2 - 1; }); }
   const t = AC.currentTime + MX(0, dl), s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
   s.buffer = NB; f.type = 'highpass'; f.frequency.value = hp;
   g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
@@ -200,10 +204,10 @@ const pix = (k, w, h, draw, s = 3, ol = 0x140a1c) => {
   const R = (x, y, ww, hh, c) => { for (let j = y; j < y + hh; j++) for (let i = x; i < x + ww; i++) if (i >= 0 && j >= 0 && i < w && j < h) b[j * w + i] = c; };
   draw(R);
   const o = b.slice();
-  if (ol) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+  if (ol) for (let j = 0; j < h; j++) rp(w, (i) => {
     const q = j * w + i;
     if (!b[q] && ((i && b[q - 1]) || (i < w - 1 && b[q + 1]) || (j && b[q - w]) || (j < h - 1 && b[q + w]))) o[q] = ol;
-  }
+  });
   cv(k, w * s, h * s, (c) => { for (let q = 0; q < w * h; q++) if (o[q]) { FR(c, css(o[q]), q % w * s, (q / w | 0) * s, s, s); } });
 }
 
@@ -211,10 +215,12 @@ const pix = (k, w, h, draw, s = 3, ol = 0x140a1c) => {
 const human = (R, L, p) => {
   const T = 10 + (p === 'i1') - (p === 'j' || p === 'jk'), ox = -(p === 'h') - (p === 'k');
   const sk = L.sk, top = L.jk || L.hd;
-  const A = (x, y, w, h, c) => { R(x + ox, y, w, h, c); R(x + ox, y, 1, h, shd(c, 0.6)); };
-  if (L.bp) { R(3 + ox, T + 1, 4, 8, L.bp); R(4 + ox, T + 2, 2, 2, 0xffd21a); R(4 + ox, T + 6, 2, 1, 0x40e0ff); }
-  if (L.sb) { R(3 + ox, T - 3, 2, 15, L.sb); R(2 + ox, T - 1, 1, 2, 0xdddddd); R(2 + ox, T + 9, 1, 2, 0xdddddd); }
-  if (L.hl) R(5 + ox, T - 7, 4, 9, L.hr);
+  // Q: R shifted by the pose offset ox.
+  const Q = (x, y, w, h, c) => R(x + ox, y, w, h, c);
+  const A = (x, y, w, h, c) => { Q(x, y, w, h, c); Q(x, y, 1, h, shd(c, 0.6)); };
+  if (L.bp) { Q(3, T + 1, 4, 8, L.bp); Q(4, T + 2, 2, 2, 0xffd21a); Q(4, T + 6, 2, 1, 0x40e0ff); }
+  if (L.sb) { Q(3, T - 3, 2, 15, L.sb); Q(2, T - 1, 1, 2, 0xdddddd); Q(2, T + 9, 1, 2, 0xdddddd); }
+  if (L.hl) Q(5, T - 7, 4, 9, L.hr);
   const Pa = L.pa, Sh = L.sh, leg = (x, h) => { R(x, 20, 3, h, Pa); R(x, 20 + h, 4, 2, Sh); };
   if (p === 'k') { leg(8, 7); R(12, 19, 8, 3, Pa); R(20, 18, 2, 4, Sh); }
   else if (p === 'j' || p === 'jk') {
@@ -225,18 +231,18 @@ const human = (R, L, p) => {
     leg(o[0], o[2]); leg(o[1], o[3]);
   }
   const ac = shd(top, 0.8), af = shd(top, 0.95);
-  if (p === 'p2') { A(11, T + 3, 8, 3, ac); R(19 + ox, T + 3, 3, 3, sk); }
-  else if (p === 's') { A(7, T - 6, 3, 8, ac); R(7 + ox, T - 8, 3, 2, sk); }
-  else if (p === 'h') { A(3, T + 1, 4, 3, ac); R(1 + ox, T + 1, 2, 3, sk); }
-  else { A(7, T + 1, 3, 8, ac); R(7 + ox, T + 9, 3, 2, sk); }
-  R(6 + ox, T, 9, 10, top); R(6 + ox, T, 2, 10, shd(top, 0.82));
-  if (L.jk) R(10 + ox, T, 2, 9, L.hd);
-  if (L.tie) { R(9 + ox, T, 4, 2, 0xeeeeee); R(10 + ox, T + 1, 2, 6, L.tie); }
-  if (L.ac) { R(9 + ox, T + 3, 1, 1, L.ac); R(10 + ox, T + 4, 1, 1, L.ac); R(9 + ox, T + 5, 1, 1, L.ac); R(11 + ox, T + 5, 2, 1, L.ac); }
-  R(6 + ox, T + 8, 9, 2, shd(top, 0.7));
-  if (L.ct) R(6 + ox, T + 8, 9, 7, L.ct);
-  if (L.pd) { R(4 + ox, T - 1, 4, 4, L.pd); R(14 + ox, T - 1, 4, 4, L.pd); }
-  if (L.hood) R(5 + ox, T - 1, 4, 3, L.hd);
+  if (p === 'p2') { A(11, T + 3, 8, 3, ac); Q(19, T + 3, 3, 3, sk); }
+  else if (p === 's') { A(7, T - 6, 3, 8, ac); Q(7, T - 8, 3, 2, sk); }
+  else if (p === 'h') { A(3, T + 1, 4, 3, ac); Q(1, T + 1, 2, 3, sk); }
+  else { A(7, T + 1, 3, 8, ac); Q(7, T + 9, 3, 2, sk); }
+  Q(6, T, 9, 10, top); Q(6, T, 2, 10, shd(top, 0.82));
+  if (L.jk) Q(10, T, 2, 9, L.hd);
+  if (L.tie) { Q(9, T, 4, 2, 0xeeeeee); Q(10, T + 1, 2, 6, L.tie); }
+  if (L.ac) { Q(9, T + 3, 1, 1, L.ac); Q(10, T + 4, 1, 1, L.ac); Q(9, T + 5, 1, 1, L.ac); Q(11, T + 5, 2, 1, L.ac); }
+  Q(6, T + 8, 9, 2, shd(top, 0.7));
+  if (L.ct) Q(6, T + 8, 9, 7, L.ct);
+  if (L.pd) { Q(4, T - 1, 4, 4, L.pd); Q(14, T - 1, 4, 4, L.pd); }
+  if (L.hood) Q(5, T - 1, 4, 3, L.hd);
   const hx = 8 + ox, hy = T - 8;
   R(hx + 2, T - 1, 3, 1, sk);
   R(hx, hy, 7, 7, sk); R(hx + 5, hy + 3, 1, 2, 0x1a0c14); R(hx + 4, hy + 6, 3, 1, shd(sk, 0.75));
@@ -249,13 +255,13 @@ const human = (R, L, p) => {
   if (L.hm) { R(hx - 1, hy - 2, 9, 6, L.hm); R(hx + 3, hy + 2, 5, 2, L.vz); }
   if (L.an) { R(hx + 3, hy - 6, 1, 4, 0x8a90a0); R(hx + 2, hy - 7, 3, 2, L.an); }
   if (L.bd) R(hx + 2, hy + 4, 5, 4, L.bd);
-  if (p === 'p1') { A(12, T + 2, 7, 3, af); R(19 + ox, T + 2, 3, 3, sk); if (L.wr) R(21 + ox, T, 2, 7, 0xa0a8b4); }
-  else if (p === 's') { A(12, T - 6, 3, 8, af); R(12 + ox, T - 8, 3, 2, sk); }
-  else if (p === 'k' || p === 'j' || p === 'jk') { A(11, T + 1, 6, 3, af); R(17 + ox, T + 1, 2, 3, sk); }
-  else if (p === 'h') { A(9, T + 1, 3, 6, af); R(9 + ox, T + 7, 3, 2, sk); }
-  else if (p === 'p2') { A(10, T + 1, 3, 5, af); R(10 + ox, T + 6, 3, 2, sk); }
-  else if (p === 'b') { A(13, T - 6, 3, 8, af); R(13 + ox, T - 8, 3, 2, sk); }
-  else { A(10, T + 1, 3, 8, af); R(10 + ox, T + 9, 3, 2, sk); }
+  if (p === 'p1') { A(12, T + 2, 7, 3, af); Q(19, T + 2, 3, 3, sk); if (L.wr) Q(21, T, 2, 7, 0xa0a8b4); }
+  else if (p === 's') { A(12, T - 6, 3, 8, af); Q(12, T - 8, 3, 2, sk); }
+  else if (p === 'k' || p === 'j' || p === 'jk') { A(11, T + 1, 6, 3, af); Q(17, T + 1, 2, 3, sk); }
+  else if (p === 'h') { A(9, T + 1, 3, 6, af); Q(9, T + 7, 3, 2, sk); }
+  else if (p === 'p2') { A(10, T + 1, 3, 5, af); Q(10, T + 6, 3, 2, sk); }
+  else if (p === 'b') { A(13, T - 6, 3, 8, af); Q(13, T - 8, 3, 2, sk); }
+  else { A(10, T + 1, 3, 8, af); Q(10, T + 9, 3, 2, sk); }
 }
 const drone = (R, f) => {
   R(5, 4, 8, 4, 0x5a6070); R(6, 3, 6, 1, 0x8a90a0); R(10, 5, 2, 2, 0xff2a3a); R(8, 8, 2, 2, 0x333344);
@@ -269,7 +275,7 @@ const dog = (R, f) => {
 const condor = (R, f) => {
   const k = 0x1a1a24, m = 0x3a3e4c, y = f ? 2 : 8;
   R(0, y, 13, 24, k); R(31, y, 13, 24, k);
-  for (let i = 0; i < 4; i++) { R(1 + i * 3, y + 22, 2, 5 + i % 2 * 3, 0x9aa0ac); R(32 + i * 3, y + 22, 2, 5 + (i + 1) % 2 * 3, 0x9aa0ac); }
+  rp(4, (i) => { R(1 + i * 3, y + 22, 2, 5 + i % 2 * 3, 0x9aa0ac); R(32 + i * 3, y + 22, 2, 5 + (i + 1) % 2 * 3, 0x9aa0ac); });
   R(15, 31, 5, 11, m); R(24, 31, 5, 11, m); R(13, 42, 8, 3, 0xd6a020); R(23, 42, 8, 3, 0xd6a020);
   R(12, 15, 20, 17, 0x262834); R(14, 17, 16, 10, m); R(20, 20, 4, 4, 0xff2a4a);
   R(8, 16, 5, 11, m); R(31, 16, 5, 11, m); R(8, 26, 5, 3, 0xff2a4a); R(31, 26, 5, 3, 0xff2a4a);
@@ -279,8 +285,8 @@ const condor = (R, f) => {
 
 // The Platanus logo: a yellow disc with three cream banana strokes.
 const platanusLogo = (c, x, y, r) => {
-  c.fillStyle = PL; DOT(c, x, y, r);
-  c.strokeStyle = '#fffbe4'; c.lineCap = 'butt';
+  FS(c, PL); DOT(c, x, y, r);
+  SS(c, '#fffbe4'); c.lineCap = 'butt';
   [[0.05, -0.66, 0.12, -0.05, -0.72, -0.07, 0.075], [0.12, -0.62, 0.16, 0.04, -0.44, 0.39, 0.09], [0.17, -0.65, 0.68, 0.02, 0.2, 0.72, 0.11]]
     .forEach(([a, b, qx, qy, d, e, w]) => {
       c.lineWidth = w * r; c.beginPath(); c.moveTo(x + a * r, y + b * r);
@@ -289,7 +295,7 @@ const platanusLogo = (c, x, y, r) => {
 }
 
 const grad = (c, h, stops, y0 = 0) => { const g = c.createLinearGradient(0, y0, 0, h); stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s)); return g; }
-const poly = (c, pts, col) => { c.fillStyle = col; c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); }
+const poly = (c, pts, col) => { FS(c, col); c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); }
 const FONT = 'px Impact,"Arial Black",sans-serif';
 // Chilean flag with its five-point star, w wide.
 const flag = (c, x, y, w) => {
@@ -300,16 +306,15 @@ const flag = (c, x, y, w) => {
   FR(c, '#0039a6', x, y, h / 2, h / 2);
   poly(c, [...Array(10)].map((_, i) => { const r = (i % 2 ? 0.4 : 1) * h / 7, a = i * PI / 5 - PI / 2; return [x + h / 4 + r * COS(a), y + h / 4 + r * SIN(a)]; }), WH);
 }
-// Title logo: slanted chrome/neon words with speed streaks and the flag.
+// Title logo: slanted chrome/neon words and the flag.
 const logoTex = () => {
   cv('logo', 700, 270, (c) => {
     c.setTransform(1, 0, -0.2, 1, 40, 0);
-    [[40, 70, PK], [520, 40, CY], [50, 176, CY], [560, 200, PK]].forEach(([x, y, k]) => { FR(c, k, x, y, 110, 6); c.fillRect(x + 24, y + 12, 60, 4); });
     [['HACKERS', 84, 78, PK, [WH, '#8ff8ff', '#1a7aff']], ['MUTANTES', 172, 84, '#3a0a4a', [YL, PK, '#9b1aff']], ['CHILENOS', 248, 60, CY, [WH, '#c8c8e8', '#6a6a98']]].forEach(([t, y, z, o, g]) => {
       c.font = '900 ' + z + FONT; c.textAlign = 'center'; c.lineJoin = 'round';
-      c.lineWidth = 18; c.strokeStyle = DK; c.strokeText(t, 342, y + 6, 500); c.strokeText(t, 336, y, 500);
-      c.lineWidth = 7; c.strokeStyle = o; c.strokeText(t, 336, y, 500);
-      c.fillStyle = grad(c, y, g, y - z * 0.75); c.fillText(t, 336, y, 500);
+      c.lineWidth = 18; SS(c, DK); c.strokeText(t, 342, y + 6, 500); c.strokeText(t, 336, y, 500);
+      c.lineWidth = 7; SS(c, o); c.strokeText(t, 336, y, 500);
+      FS(c, grad(c, y, g, y - z * 0.75)); c.fillText(t, 336, y, 500);
     });
     c.setTransform(1, 0, 0, 1, 0, 0); flag(c, 616, 118, 64);
   });
@@ -318,9 +323,9 @@ const logoTex = () => {
 const badge = (k, t, col) => {
   cv(k, 150, 36, (c) => {
     poly(c, [[14, 2], [148, 2], [136, 34], [2, 34]], DK);
-    c.lineWidth = 3; c.strokeStyle = css(col); c.stroke();
+    c.lineWidth = 3; SS(c, css(col)); c.stroke();
     poly(c, [[14, 2], [38, 2], [26, 34], [2, 34]], css(col));
-    c.font = 'italic 900 20' + FONT; c.textAlign = 'center'; c.fillStyle = WH; c.fillText(t, 88, 26, 96);
+    c.font = 'italic 900 20' + FONT; c.textAlign = 'center'; FS(c, WH); c.fillText(t, 88, 26, 96);
   });
 }
 const ridge = (c, base, amp, step, col, snow) => {
@@ -342,20 +347,20 @@ const city = (c, col, lit, h0, h1) => {
 const tower = (c, x, col, lit) => {
   poly(c, [[x - 16, 390], [x - 7, 40], [x + 7, 40], [x + 16, 390]], col);
   FR(c, col, x - 5, 22, 10, 20);
-  if (lit) { c.fillStyle = '#6ae4ff'; for (let y = 60; y < 380; y += 14) c.fillRect(x - 4, y, 8, 2); }
+  if (lit) { FS(c, '#6ae4ff'); for (let y = 60; y < 380; y += 14) c.fillRect(x - 4, y, 8, 2); }
 }
 const tag = (c, x, y, w) => {
   const cols = [PK, '#39ff6a', CY, YL, '#9b5cff', '#ff8a1e'];
   c.lineWidth = 3; c.lineCap = 'round';
-  for (let k = 0; k < 2; k++) {
-    c.strokeStyle = cols[ri(0, 6)]; c.beginPath(); c.moveTo(x, y + ri(0, 24));
+  rp(2, (k) => {
+    SS(c, cols[ri(0, 6)]); c.beginPath(); c.moveTo(x, y + ri(0, 24));
     for (let i = 1; i < 6; i++) c.quadraticCurveTo(x + i * w / 6 - w / 12, y + ri(-16, 36), x + i * w / 6, y + ri(0, 24));
     c.stroke();
-  }
+  });
 }
-const txtC = (c, t, x, y, sz, col) => { c.font = 'bold ' + sz + 'px monospace'; c.textAlign = 'center'; c.fillStyle = col; c.fillText(t, x, y); }
+const txtC = (c, t, x, y, sz, col) => { c.font = 'bold ' + sz + 'px monospace'; c.textAlign = 'center'; FS(c, col); c.fillText(t, x, y); }
 
-const cloud = (c, x, y) => { c.fillStyle = 'rgba(255,255,255,.85)'; [[0, 0, 40], [34, -12, 30], [64, 2, 34]].forEach(([a, b, r]) => { DOT(c, x + a, y + b, r, r * 0.6); }); };
+const cloud = (c, x, y) => { FS(c, 'rgba(255,255,255,.85)'); [[0, 0, 40], [34, -12, 30], [64, 2, 34]].forEach(([a, b, r]) => { DOT(c, x + a, y + b, r, r * 0.6); }); };
 // Skies: 0 Santiago golden hour, 1 Providencia dusk, 2 Valpo day, 3 Atacama dusk, 4 Patagonia, 5 Costanera night, 6 title dusk.
 const DUSK = ['#140a36', '#4a2a8a', '#c04a9a', '#ff8a7a', '#ffc27a'];
 const SKY = [['#6fa0e0', '#c8b4e8', '#ffd0a0'], DUSK, ['#4a9ae8', '#a8d4ff', '#e8f6ff'], ['#2a1a5a', '#a04a8a', '#ff9a6a', '#ffc88a'], ['#3a6ac0', '#9cc4ec', '#ffe0c8'], ['#040410', '#100c2a', '#2a1a4a'], DUSK];
@@ -363,25 +368,25 @@ const farLayer = (s) => {
   cv('f' + s, 800, 390, (c) => {
     sd = 5 + s;
     FR(c, grad(c, 390, SKY[s]), 0, 0, 800, 390);
-    if (s % 2 || s > 5) for (let i = 0; i < 90; i++) { FR(c, `rgba(255,255,255,${rr()})`, ri(0, 800), ri(0, s === 5 ? 220 : 110), 1 + (rr() < 0.1), 1 + (rr() < 0.1)); }
-    if (s === 5) { c.fillStyle = '#eef0ff'; DOT(c, 660, 80, 26); }
+    if (s % 2 || s > 5) rp(90, (i) => { FR(c, `rgba(255,255,255,${rr()})`, ri(0, 800), ri(0, s === 5 ? 220 : 110), 1 + (rr() < 0.1), 1 + (rr() < 0.1)); });
+    if (s === 5) { FS(c, '#eef0ff'); DOT(c, 660, 80, 26); }
     // Providencia and the title share the Andes + Costanera skyline.
     if (s === 1 || s > 5) { ridge(c, 290, 150, 50, '#5a4a9a', '#f4eeff'); ridge(c, 330, 60, 40, '#3a2c6a'); tower(c, 620, '#2a3a7a', 1); city(c, '#1c1638', 1, 50, 170); }
     if (s > 5) {
       FR(c, '#4a4466', 0, 334, 800, 56); FR(c, '#6c6690', 0, 328, 800, 8);
       for (let x = 160; x < 800; x += 210) tag(c, x, 346, 120);
-      c.font = 'italic 900 38' + FONT; c.lineWidth = 6; c.strokeStyle = YL; c.strokeText('STGO', 40, 380); c.fillStyle = PK; c.fillText('STGO', 40, 380);
+      c.font = 'italic 900 38' + FONT; c.lineWidth = 6; SS(c, YL); c.strokeText('STGO', 40, 380); FS(c, PK); c.fillText('STGO', 40, 380);
     }
     if (s === 0) { ridge(c, 300, 190, 50, '#8a86b8', '#fff6f0'); ridge(c, 345, 70, 40, '#a49ab8'); tower(c, 600, '#9a9cc0'); city(c, '#b0a8c4', 0, 30, 110); }
     if (s === 2 || s === 4) { cloud(c, 90, 70); cloud(c, 470, 46); }
     if (s === 2) {
       FR(c, '#2a6ab8', 0, 250, 800, 140);
-      for (let i = 0; i < 60; i++) { FR(c, 'rgba(255,255,255,.35)', ri(0, 800), ri(255, 385), ri(8, 30), 2); }
-      c.fillStyle = '#3a4a6a';
+      rp(60, (i) => { FR(c, 'rgba(255,255,255,.35)', ri(0, 800), ri(255, 385), ri(8, 30), 2); });
+      FS(c, '#3a4a6a');
       [[90, 1], [300, -1]].forEach(([x, d]) => { c.fillRect(x, 150, 8, 100); c.fillRect(d < 0 ? x - 92 : x - 10, 150, 110, 6); c.fillRect(x + d * 70, 156, 2, 50); });
       c.fillRect(380, 228, 170, 24);
       const cc = ['#c83a3a', '#3a7ac8', '#e8b03a', '#3ab07a'];
-      for (let i = 0; i < 12; i++) { FR(c, cc[i % 4], 390 + i % 6 * 24, 216 - (i / 6 | 0) * 10, 22, 9); }
+      rp(12, (i) => { FR(c, cc[i % 4], 390 + i % 6 * 24, 216 - (i / 6 | 0) * 10, 22, 9); });
       poly(c, [[0, 390], [0, 170], [120, 200], [200, 260], [260, 390]], '#4a6a4a');
     }
     // Atacama: Licancabur-style volcano with a snow cap and red rock spires.
@@ -396,12 +401,12 @@ const farLayer = (s) => {
       ridge(c, 300, 120, 40, '#6a7aa8', '#f6f8ff');
       [[300, 90], [360, 56], [420, 100]].forEach(([x, t]) => { poly(c, [[x - 34, 300], [x - 18, t], [x + 18, t + 6], [x + 30, 300]], '#7a7286'); poly(c, [[x - 18, t], [x + 18, t + 6], [x + 14, t + 30], [x - 16, t + 24]], '#f4f4ff'); });
       ridge(c, 296, 30, 40, '#3a5a3a'); FR(c, '#3aa8c8', 0, 286, 800, 50); FR(c, '#7a9a4a', 0, 336, 800, 54);
-      for (let i = 0; i < 30; i++) FR(c, 'rgba(255,255,255,.3)', ri(0, 800), ri(290, 332), ri(10, 40), 2);
+      rp(30, (i) => { FR(c, 'rgba(255,255,255,.3)', ri(0, 800), ri(290, 332), ri(10, 40), 2); });
     }
     if (s === 5) {
       ridge(c, 230, 110, 50, '#15112c', '#2c2848');
       FR(c, '#08081a', 0, 250, 800, 140);
-      for (let y = 262; y < 390; y += 9) for (let i = 0; i < 70; i++) { FR(c, rr() < 0.6 ? '#ffb05a' : '#fff4d0', ri(0, 800), y + ri(0, 4), 2, 1 + (y > 330)); }
+      for (let y = 262; y < 390; y += 9) rp(70, (i) => { FR(c, rr() < 0.6 ? '#ffb05a' : '#fff4d0', ri(0, 800), y + ri(0, 4), 2, 1 + (y > 330)); });
     }
   });
 }
@@ -423,19 +428,19 @@ const downtown = (c) => {
     FR(c, 'rgba(0,0,0,.18)', x, top, w, 6); c.fillRect(x, 166, w, 10); c.fillRect(x + w - 4, top, 4, 290 - top);
     for (let y = top + 22; y < 150; y += 40) for (let i = x + 16; i < x + w - 30; i += 36) { FR(c, '#2a3856', i, y, 20, 28); FR(c, '#5e7ca8', i + 2, y + 2, 7, 12); }
     FR(c, '#1b2433', x + 14, 200, w - 28, 90);
-    if (rr() < 0.5) { FR(c, '#7a7f88', x + 14, 200, w - 28, 90); c.fillStyle = '#6a6f78'; for (let y = 204; y < 290; y += 8) c.fillRect(x + 14, y, w - 28, 2); tag(c, x + 30, 220, w - 70); }
+    if (rr() < 0.5) { FR(c, '#7a7f88', x + 14, 200, w - 28, 90); FS(c, '#6a6f78'); for (let y = 204; y < 290; y += 8) c.fillRect(x + 14, y, w - 28, 2); tag(c, x + 30, 220, w - 70); }
     for (let i = 0; i < w - 28; i += 16) { FR(c, i % 32 ? '#f4f0e6' : aw, x + 14 + i, 186, MN(16, w - 28 - i), 14); }
     FR(c, '#16121e', x + w / 2 - 64, 160, 128, 22);
     txtC(c, shops[ri(0, shops.length)], x + w / 2, 176, 13, YL);
-    for (let i = 0; i < 6; i++) { FR(c, [PK, CY, YL, WH][ri(0, 4)], x + ri(2, 12), ri(205, 280), 6, 5); }
+    rp(6, (i) => { FR(c, [PK, CY, YL, WH][ri(0, 4)], x + ri(2, 12), ri(205, 280), 6, 5); });
     x += w;
   }
   // Street trees on the building seams, then a red-roofed kiosco selling diarios and bip!.
-  sm.forEach((x) => { FR(c, '#5a3a24', x - 4, 196, 8, 94); c.fillStyle = '#4a8a3a'; [[0, 178, 34], [-24, 196, 24], [24, 196, 24]].forEach(([d, y, r]) => { DOT(c, x + d, y, r); }); });
+  sm.forEach((x) => { FR(c, '#5a3a24', x - 4, 196, 8, 94); FS(c, '#4a8a3a'); [[0, 178, 34], [-24, 196, 24], [24, 196, 24]].forEach(([d, y, r]) => { DOT(c, x + d, y, r); }); });
   FR(c, '#2a6a3a', 470, 210, 90, 80); poly(c, [[460, 212], [570, 212], [560, 190], [470, 190]], '#c8202a'); txtC(c, 'KIOSCO', 515, 206, 11, WH);
   // A quiltro (Santiago street dog) napping by the kiosco.
-  c.fillStyle = '#b8864a'; DOT(c, 610, 280, 26, 9); DOT(c, 588, 276, 8); FR(c, '#7a5530', 583, 267, 5, 7); txtC(c, 'z Z', 590, 258, 11, WH);
-  for (let i = 0; i < 8; i++) FR(c, [YL, CY, PK, WH][i % 4], 478 + i % 4 * 20, 222 + (i >> 2) * 22, 14, 18);
+  FS(c, '#b8864a'); DOT(c, 610, 280, 26, 9); DOT(c, 588, 276, 8); FR(c, '#7a5530', 583, 267, 5, 7); txtC(c, 'z Z', 590, 258, 11, WH);
+  rp(8, (i) => { FR(c, [YL, CY, PK, WH][i % 4], 478 + i % 4 * 20, 222 + (i >> 2) * 22, 14, 18); });
 }
 const provi = (c) => {
   // Office blocks with gaps, so the Andes and the Costanera show through behind them.
@@ -449,7 +454,7 @@ const provi = (c) => {
     FR(c, '#0c0a18', x + 16, 196, 224, 94);
     FR(c, 'rgba(120,160,255,.08)', x + 24, 204, 208, 80);
     const col = [PK, CY, '#39ff6a', YL][ri(0, 4)];
-    c.shadowColor = col; c.shadowBlur = 14; c.strokeStyle = col; c.lineWidth = 3; c.strokeRect(x + 48, 160, 160, 30);
+    c.shadowColor = col; c.shadowBlur = 14; SS(c, col); c.lineWidth = 3; c.strokeRect(x + 48, 160, 160, 30);
     txtC(c, ns[ri(0, ns.length)], x + 128, 183, 20, col); c.shadowBlur = 0;
     tag(c, x + 220, 230, 40);
   }
@@ -457,35 +462,35 @@ const provi = (c) => {
 const valpo = (c) => {
   poly(c, [[0, 290], [0, 40], [260, 10], [470, 70], [560, 190], [840, 190], [940, 80], [1024, 40], [1024, 290]], '#4a5a3c');
   const hc = ['#ffcf3a', '#3ab0ff', '#ff4a6a', '#7ad84a', '#ff8a2a', '#c86aff', '#f4f4f4', '#2ac8b0'];
-  for (let i = 0; i < 24; i++) {
+  rp(24, (i) => {
     const x = i % 4 ? ri(0, 400) : ri(900, 990), y = ri(40, 130), w = ri(40, 70), h = ri(34, 52);
     FR(c, hc[ri(0, 8)], x, y, w, h);
     FR(c, '#5a3a3a', x - 3, y - 6, w + 6, 7);
-    c.fillStyle = '#20304a'; for (let k = x + 8; k < x + w - 10; k += 16) c.fillRect(k, y + 10, 9, 12);
-  }
-  c.strokeStyle = '#3a3a3a'; c.lineWidth = 4; LN(c, 300, 200, 450, 40);
+    FS(c, '#20304a'); for (let k = x + 8; k < x + w - 10; k += 16) c.fillRect(k, y + 10, 9, 12);
+  });
+  SS(c, '#3a3a3a'); c.lineWidth = 4; LN(c, 300, 200, 450, 40);
   poly(c, [[340, 150], [380, 150], [400, 128], [360, 128]], '#e83a3a');
   FR(c, '#8c7c6c', 0, 190, 1024, 100);
-  for (let i = 0; i < 10; i++) { c.fillStyle = hc[ri(0, 8)]; DOT(c, ri(20, 1000), ri(205, 280), ri(14, 40)); }
+  rp(10, (i) => { FS(c, hc[ri(0, 8)]); DOT(c, ri(20, 1000), ri(205, 280), ri(14, 40)); });
   // Street-art cat mural, a Valparaíso classic.
-  FR(c, '#6a3aa8', 250, 196, 140, 90); c.fillStyle = '#3ab0e8'; DOT(c, 320, 246, 34);
+  FR(c, '#6a3aa8', 250, 196, 140, 90); FS(c, '#3ab0e8'); DOT(c, 320, 246, 34);
   poly(c, [[290, 232], [296, 196], [316, 216]], '#3ab0e8'); poly(c, [[350, 232], [344, 196], [324, 216]], '#3ab0e8');
-  [306, 334].forEach((x) => { c.fillStyle = YL; DOT(c, x, 242, 8, 10); FR(c, '#111', x - 2, 235, 4, 14); });
-  c.font = 'bold 40px monospace'; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = '#1a1020'; c.strokeText('VALPO', 640, 262); c.fillStyle = '#ffcf3a'; c.fillText('VALPO', 640, 262);
+  [306, 334].forEach((x) => { FS(c, YL); DOT(c, x, 242, 8, 10); FR(c, '#111', x - 2, 235, 4, 14); });
+  c.font = 'bold 40px monospace'; c.textAlign = 'center'; c.lineWidth = 5; SS(c, '#1a1020'); c.strokeText('VALPO', 640, 262); FS(c, '#ffcf3a'); c.fillText('VALPO', 640, 262);
 }
 const atacama = (c) => {
   [[120, 1], [430, 0.8], [760, 1.1]].forEach(([x, k]) => {
     FR(c, '#c8ccd8', x - 6, 110, 12, 92);
     c.save(); c.translate(x, 100); c.rotate(-0.5);
-    c.fillStyle = '#eef1f8'; DOT(c, 0, 0, 48 * k, 20 * k);
-    c.fillStyle = '#b8bccc'; DOT(c, 0, 4, 40 * k, 13 * k);
-    c.strokeStyle = '#ddd'; c.lineWidth = 2; c.beginPath(); c.moveTo(-30 * k, 0); c.lineTo(0, -40 * k); c.lineTo(30 * k, 0); c.stroke();
+    FS(c, '#eef1f8'); DOT(c, 0, 0, 48 * k, 20 * k);
+    FS(c, '#b8bccc'); DOT(c, 0, 4, 40 * k, 13 * k);
+    SS(c, '#ddd'); c.lineWidth = 2; c.beginPath(); c.moveTo(-30 * k, 0); c.lineTo(0, -40 * k); c.lineTo(30 * k, 0); c.stroke();
     c.restore();
   });
-  for (let x = 200; x < 1024; x += 300) for (let i = 0; i < 4; i++) poly(c, [[x + i * 44, 198], [x + i * 44 + 38, 198], [x + i * 44 + 46, 178], [x + i * 44 + 8, 178]], i % 2 ? '#2a4cb0' : '#1e3c9a');
-  c.fillStyle = '#4a4a58'; for (let x = 0; x < 1024; x += 64) c.fillRect(x, 200, 4, 90);
+  for (let x = 200; x < 1024; x += 300) rp(4, (i) => { poly(c, [[x + i * 44, 198], [x + i * 44 + 38, 198], [x + i * 44 + 46, 178], [x + i * 44 + 8, 178]], i % 2 ? '#2a4cb0' : '#1e3c9a'); });
+  FS(c, '#4a4a58'); for (let x = 0; x < 1024; x += 64) c.fillRect(x, 200, 4, 90);
   c.fillRect(0, 203, 1024, 3);
-  c.strokeStyle = 'rgba(170,170,190,.35)'; c.lineWidth = 1;
+  SS(c, 'rgba(170,170,190,.35)'); c.lineWidth = 1;
   for (let x = -96; x < 1100; x += 12) { LN(c, x, 206, x + 84, 290); LN(c, x, 290, x + 84, 206); }
 }
 // Patagonia: estancia houses with tin roofs, wind-bent lengas, a fence and a guanaco.
@@ -496,7 +501,7 @@ const patag = (c) => {
     for (let i = x + 16; i < x + 140; i += 44) FR(c, '#2a3040', i, 172, 22, 26);
     FR(c, '#5a3a24', x + 62, 200, 26, 50);
     poly(c, [[x + 220, 250], [x + 228, 250], [x + 250, 170], [x + 244, 168]], '#4a3020');
-    c.fillStyle = '#3a6a32'; DOT(c, x + 270, 168, 44, 18, -0.3);
+    FS(c, '#3a6a32'); DOT(c, x + 270, 168, 44, 18, -0.3);
   }
   const g = 700, k = '#c8945a';
   FR(c, k, g, 196, 44, 18); FR(c, k, g + 38, 166, 8, 34); FR(c, k, g + 36, 160, 16, 9); FR(c, k, g + 40, 154, 3, 7); FR(c, '#f0e0c8', g + 4, 206, 36, 8);
@@ -505,13 +510,13 @@ const patag = (c) => {
 }
 const torre = (c) => {
   FR(c, 'rgba(120,170,255,.07)', 0, 0, 1024, 150);
-  c.fillStyle = '#262838'; for (let x = 0; x < 1024; x += 128) c.fillRect(x, 0, 6, 150);
+  FS(c, '#262838'); for (let x = 0; x < 1024; x += 128) c.fillRect(x, 0, 6, 150);
   c.fillRect(0, 70, 1024, 4); c.fillRect(0, 146, 1024, 8);
   FR(c, '#b01828', 250, 14, 220, 40); txtC(c, 'CONDOR CORP', 360, 42, 22, WH);
   FR(c, '#12141c', 0, 152, 1024, 138);
   for (let x = 10; x < 1000; x += 86) {
     if (x > 540 && x < 700) continue;
-    FR(c, '#0a0b10', x, 166, 72, 124); c.strokeStyle = '#2c3040'; c.lineWidth = 2; c.strokeRect(x, 166, 72, 124);
+    FR(c, '#0a0b10', x, 166, 72, 124); SS(c, '#2c3040'); c.lineWidth = 2; c.strokeRect(x, 166, 72, 124);
     for (let y = 176; y < 286; y += 10) { FR(c, '#1a1d28', x + 6, y, 60, 7); FR(c, ['#39ff6a', CY, '#ff3040', YL][ri(0, 4)], x + 8 + ri(0, 50), y + 2, 3, 3); }
   }
   FR(c, '#8a90a0', 580, 170, 100, 120); FR(c, '#5a6070', 629, 170, 2, 120);
@@ -521,16 +526,16 @@ const groundLayer = (s) => {
   cv('g' + s, 256, 210, (c) => {
     sd = 50 + s;
     FR(c, ['#b3a493', '#17151f', '#5e5664', '#8b4a30', '#857e70', '#14161f'][s], 0, 0, 256, 210);
-    if (s === 4) for (let i = 0; i < 260; i++) FR(c, rr() < 0.5 ? '#a09888' : '#5e5848', ri(0, 256), ri(0, 210), 3, 2);
-    if (s === 0) { c.strokeStyle = '#9a8a7a'; c.lineWidth = 2; for (let i = -256; i < 512; i += 32) { LN(c, i, 0, i + 210, 210); LN(c, i + 210, 0, i, 210); } }
+    if (s === 4) rp(260, (i) => { FR(c, rr() < 0.5 ? '#a09888' : '#5e5848', ri(0, 256), ri(0, 210), 3, 2); });
+    if (s === 0) { SS(c, '#9a8a7a'); c.lineWidth = 2; for (let i = -256; i < 512; i += 32) { LN(c, i, 0, i + 210, 210); LN(c, i + 210, 0, i, 210); } }
     if (s === 1) {
-      FR(c, '#2b2939', 0, 0, 256, 44); c.fillStyle = '#3a3850'; for (let x = 0; x < 256; x += 64) c.fillRect(x, 0, 2, 44); c.fillRect(0, 42, 256, 3);
-      for (let i = 0; i < 14; i++) { FR(c, rr() < 0.5 ? 'rgba(255,60,166,.14)' : 'rgba(64,224,255,.13)', ri(0, 200), ri(50, 200), ri(20, 56), 3); }
+      FR(c, '#2b2939', 0, 0, 256, 44); FS(c, '#3a3850'); for (let x = 0; x < 256; x += 64) c.fillRect(x, 0, 2, 44); c.fillRect(0, 42, 256, 3);
+      rp(14, (i) => { FR(c, rr() < 0.5 ? 'rgba(255,60,166,.14)' : 'rgba(64,224,255,.13)', ri(0, 200), ri(50, 200), ri(20, 56), 3); });
     }
-    if (s === 2) for (let y = 0; y < 210; y += 14) for (let x = (y / 14 % 2) * 8 - 16; x < 272; x += 16) { c.fillStyle = rr() < 0.5 ? '#7a7084' : '#6c6476'; DOT(c, x, y + 7, 7, 6); }
-    if (s === 3) { for (let i = 0; i < 300; i++) { FR(c, rr() < 0.5 ? '#a05a3a' : '#74402a', ri(0, 256), ri(0, 210), 2, 2); } FR(c, '#6e3a26', 0, 120, 256, 5); c.fillRect(0, 150, 256, 5); }
+    if (s === 2) for (let y = 0; y < 210; y += 14) for (let x = (y / 14 % 2) * 8 - 16; x < 272; x += 16) { FS(c, rr() < 0.5 ? '#7a7084' : '#6c6476'); DOT(c, x, y + 7, 7, 6); }
+    if (s === 3) { rp(300, (i) => { FR(c, rr() < 0.5 ? '#a05a3a' : '#74402a', ri(0, 256), ri(0, 210), 2, 2); }); FR(c, '#6e3a26', 0, 120, 256, 5); c.fillRect(0, 150, 256, 5); }
     if (s === 5) {
-      c.strokeStyle = '#262a3a'; c.lineWidth = 2;
+      SS(c, '#262a3a'); c.lineWidth = 2;
       for (let x = 0; x < 256; x += 64) { LN(c, x, 0, x, 210); }
       for (let y = 0; y < 210; y += 42) { LN(c, 0, y, 256, y); }
       FR(c, 'rgba(160,200,255,.05)', 0, 60, 256, 30);
@@ -561,17 +566,17 @@ const genArt = () => {
     platanusLogo(c, 56, 56, 42);
     txtC(c, 'PLATANUS', 166, 44, 22, PL); txtC(c, 'HACK 26', 166, 70, 22, WH); txtC(c, 'SANTIAGO', 166, 94, 13, PL);
   });
-  for (let s = 0; s < 6; s++) { farLayer(s); midLayer(s); groundLayer(s); STG[s].sg.forEach(([t, bg], k) => signTex('sg' + s + k, t, bg)); }
+  rp(6, (s) => { farLayer(s); midLayer(s); groundLayer(s); STG[s].sg.forEach(([t, bg], k) => signTex('sg' + s + k, t, bg)); });
   farLayer(6); logoTex(); S.textures.get('logo').setFilter(Phaser.Textures.FilterMode.LINEAR);
   // Foreground street lamp (one per 1100px tile) and diagonal rain streaks.
   cv('fg', 1100, 600, (c) => {
-    c.fillStyle = 'rgba(255,214,120,.16)'; DOT(c, 92, 196, 46);
+    FS(c, 'rgba(255,214,120,.16)'); DOT(c, 92, 196, 46);
     FR(c, '#0b0814', 40, 186, 12, 414); FR(c, '#0b0814', 40, 180, 60, 8); FR(c, '#0b0814', 76, 186, 28, 8); FR(c, '#ffe9a0', 80, 194, 22, 4);
     FR(c, '#0b0814', 28, 560, 36, 40);
   });
   cv('rn', 256, 256, (c) => {
-    c.strokeStyle = 'rgba(170,200,255,.4)';
-    for (let i = 0; i < 70; i++) { const x = rr() * 256, y = rr() * 256; LN(c, x, y, x - 4, y + 14); }
+    SS(c, 'rgba(170,200,255,.4)');
+    rp(70, (i) => { const x = rr() * 256, y = rr() * 256; LN(c, x, y, x - 4, y + 14); });
   });
   HER.forEach((h, i) => badge('nb' + i, h.n, h.c));
 }
@@ -584,6 +589,10 @@ const ut = (x, y, t, sz, d = 10, col, ox) => ui(txt(x, y, t, sz, col, ox), d);
 // Full-screen dim overlay and a tween shorthand (k: destroy the target when done).
 const dim = (a, d = 3, k = 0x0a0614) => ui(AD.rectangle(W / 2, H / 2, W, H, k, a), d);
 const tw = (t, o, k) => S.tweens.add({ targets: t, ...o, onComplete: k && (() => t.destroy()) });
+// Fade out over d ms after dl ms; destroys the object unless k is 0.
+const fo = (t, d, dl = 0, k = 1) => tw(t, { alpha: 0, duration: d, delay: dl }, k);
+// Screen-anchored tiling layer.
+const TL = (x, y, w, h, key, d) => ui(AD.tileSprite(x, y, w, h, key).setOrigin(0), d);
 const clearAll = () => { UI.forEach((o) => { S.tweens.killTweensOf(o); o.destroy(); }); UI = []; }
 const clearWorld = () => {
   [...E, ...PR, ...IT, ...AL].forEach((o) => { o.s.destroy(); if (o.sd) o.sd.destroy(); });
@@ -594,9 +603,9 @@ const clearWorld = () => {
 const camX = () => CM.scrollX;
 const bgSet = (i) => {
   return {
-    f: ui(AD.tileSprite(0, 0, W, FLOOR, 'f' + i).setOrigin(0), 0),
-    m: ui(AD.tileSprite(0, 100, W, 290, 'm' + i).setOrigin(0), 1),
-    g: ui(AD.tileSprite(0, FLOOR - 2, W, 210, 'g' + i).setOrigin(0), 2),
+    f: TL(0, 0, W, FLOOR, 'f' + i, 0),
+    m: TL(0, 100, W, 290, 'm' + i, 1),
+    g: TL(0, FLOOR - 2, W, 210, 'g' + i, 2),
   };
 }
 const scrollBg = (x) => { L.f.tilePositionX = x * 0.2; L.m.tilePositionX = x; L.g.tilePositionX = x; if (L.p) L.p.tilePositionX = x * 1.4; }
@@ -605,7 +614,7 @@ const banner = (lines, ms = 2400) => {
   lines.forEach((t, k) => {
     const o = ut(-300, 210 + k * 46, t, k === 1 ? 40 : k ? 18 : 24, 4000, k === 1 ? YL : WH);
     tw(o, { x: W / 2, duration: 350, delay: k * 120, ease: 'Back.Out' });
-    tw(o, { alpha: 0, delay: ms, duration: 400 });
+    fo(o, 400, ms, 0);
   });
 }
 const logoBadge = (x, y, s) => {
@@ -626,12 +635,12 @@ const pop = (x, y, t, col = WH, sz = 16) => {
   const o = AD.text(x, y, t, TS(sz, col)).setOrigin(0.5).setDepth(3000);
   tw(o, { y: y - 40, alpha: { from: 1, to: 0 }, duration: 1100, ease: 'Quad.In' }, 1);
 }
-const boom = (x, y) => { for (let i = 0; i < 4; i++) spark(x + (RND() - 0.5) * 40, y + (RND() - 0.5) * 40, i % 2 ? 0xffa040 : 0xffffff); ring(x, y + 30, 50, 0xffa040); SFX_boom(); }
+const boom = (x, y) => { rp(4, (i) => { spark(x + (RND() - 0.5) * 40, y + (RND() - 0.5) * 40, i % 2 ? 0xffa040 : 0xffffff); }); ring(x, y + 30, 50, 0xffa040); SFX_boom(); }
 const ghost = (p) => {
   const g = hum(p.s.x, p.s.y, p.s.texture.key).setFlipX(p.f < 0).setTintFill(p.h.c).setAlpha(0.55).setDepth(p.y - 1);
-  tw(g, { alpha: 0, duration: 260 }, 1);
+  fo(g, 260);
 }
-const zap = (x1, y1, x2, y2, col) => tw(AD.line(0, 0, x1, y1, x2, y2, col).setOrigin(0).setLineWidth(3).setDepth(1998), { alpha: 0, duration: 120 }, 1);
+const zap = (x1, y1, x2, y2, col) => fo(AD.line(0, 0, x1, y1, x2, y2, col).setOrigin(0).setLineWidth(3).setDepth(1998), 120);
 const debris = (e) => { dust(e.x, e.y, 5); spark(e.x, e.y - 20, e.v ? 0xb8864a : 0x3a9a4a); SFX_thud(); }
 // Big shakes (boss death, quake, stomp) force past a small hit shake that is still running.
 const tn = () => S.time.now;
@@ -644,18 +653,16 @@ const shake = (d, i) => CM.shake(d, i, i > 0.01);
 // Squash (v > 0) or stretch (v < 0) that springs back to rest in 180 ms; drawE applies it.
 const squ = (o, v) => { o.sq = v; o.sqT = tn(); };
 const dust = (x, y, n = 3) => {
-  for (let i = 0; i < n; i++) {
+  rp(n, (i) => {
     const k = i - (n - 1) / 2, d = AD.circle(x + k * 12, y - 4, 5, 0xe8e0f0, 0.5).setDepth(y + 1);
     tw(d, { x: x + k * 26, y: y - 12, scale: 2.4, alpha: 0, duration: 380, ease: 'Quad.Out' }, 1);
-  }
+  });
 }
 
 // ---------- Phaser setup ----------
 
 function create() {
   S = this; AD = S.add; CM = S.cameras.main;
-  // Soft vignette (WebGL only; a no-op under Canvas) to frame the action.
-  if (CM.postFX) CM.postFX.addVignette(0.5, 0.5, 0.92, 0.3);
   AC = S.sound.context || null;
   if (AC) { MG = AC.createGain(); MG.gain.value = 0.45; MG.connect(AC.destination); }
   genArt();
@@ -684,11 +691,11 @@ const title = () => {
   ut(W / 2, 286, 'CONDOR CORP SE TOMÓ LA RED. ¡A HACKEARLOS, PO!', 15, 10, YL);
   G.ic = ut(W / 2, 318, '>>> INSERT COIN <<<', 22, 10, YL);
   G.st = ut(W / 2, 346, 'PRESIONA START', 22);
-  // Heroes stand on the wet street with a faint mirrored reflection.
+  // Heroes stand on the wet street under their name badges.
   G.hs = HER.map((h, i) => {
     const x = 160 + i * 160;
     ui(AD.image(x, 384, 'nb' + i), 10);
-    return [1.6, -0.7].map((k) => ui(hum(x, 550, 'h' + i + '_i0').setScale(1.6, k).setAlpha(k < 0 ? 0.25 : 1), 10));
+    return [ui(hum(x, 550, 'h' + i + '_i0').setScale(1.6), 10)];
   });
   logoBadge(70, 62, 0.62);
   ut(730, 40, 'RÉCORDS', 14, 10, YL);
@@ -719,7 +726,7 @@ const sel = (pi) => {
     ut(x, 386, h.d, 11, 11, css(h.c));
     ['VEL', 'FUERZA', 'HACK'].forEach((l, k) => {
       ut(x - 72, 412 + k * 20, l, 11, 11, '#aaaaaa', 0);
-      for (let q = 0; q < 5; q++) ui(AD.rectangle(x + 4 + q * 14, 412 + k * 20, 11, 9, q < h.st[k] ? h.c : 0x333344), 11);
+      rp(5, (q) => { ui(AD.rectangle(x + 4 + q * 14, 412 + k * 20, 11, 9, q < h.st[k] ? h.c : 0x333344), 11); });
     });
     ut(x, 474, '> B3: ' + h.b, 11, 11, WH);
     return { x, g, im };
@@ -1118,7 +1125,7 @@ const bossDie = (e) => {
     o.hp = 0;
     if (o.t === 'dr') { boom(o.x, o.y - o.z); o.rm = 1; } else { es(o, 'd'); o.vz = 5; o.z = 0.1; o.kx = 3; }
   });
-  for (let i = 0; i < 8; i++) later(i * 180, () => boom(e.x + (RND() - 0.5) * 120, e.y - 40 - RND() * 120));
+  rp(8, (i) => { later(i * 180, () => boom(e.x + (RND() - 0.5) * 120, e.y - 40 - RND() * 120)); });
   CM.flash(300);
   later(1900, clearStage);
 }
@@ -1193,7 +1200,7 @@ const sep = (dt) => {
 const wave = (i, k, n) => {
   const pool = STG[i].pool.split(','), q = [];
   // Waves grow every other stage so the 6-stage run stays near arcade length (~7 min).
-  for (let j = 0; j < 3 + (i >> 1) + k + (n > 1 ? 2 : 0); j++) q.push(pool[RND() * pool.length | 0]);
+  rp(3 + (i >> 1) + k + (n > 1 ? 2 : 0), (j) => { q.push(pool[RND() * pool.length | 0]); });
   return q;
 }
 const stage = (i) => {
@@ -1203,12 +1210,12 @@ const stage = (i) => {
   st = { i, d, len: 2800, wv: [650, 1450].map((x, k) => ({ x, q: wave(i, k, n) })), wi: 0, act: 0, q: [], sp: 0, lim: 650 };
   L = bgSet(i);
   // Street lamps in the foreground (faster parallax) on the city stages; rain in Providencia.
-  if (i < 3) L.p = ui(AD.tileSprite(0, 0, W, H, 'fg').setOrigin(0).setAlpha(0.92), 900);
-  if (i === 1) L.r = ui(AD.tileSprite(0, 0, W, H, 'rn').setOrigin(0), 950);
+  if (i < 3) L.p = TL(0, 0, W, H, 'fg', 900).setAlpha(0.92);
+  if (i === 1) L.r = TL(0, 0, W, H, 'rn', 950);
   // Wind streaks: the rain texture turned sideways, shown only during gusts.
   if (i === 4) L.w = ui(AD.tileSprite(W / 2, H / 2, 1100, 1100, 'rn').setAngle(82).setAlpha(0), 950);
-  if (!i) tw(ut(W / 2, 548, 'B1 GOLPE · MANTÉN B1: BLOQUEO · B2 SALTO · B3 HACKEO', 13, 4001, YL), { alpha: 0, delay: 7000, duration: 800 });
-  WO.push(AD.image(560, 106, 'pb').setOrigin(0.5, 0).setDepth(5), AD.image(2240, 106, 'pb').setOrigin(0.5, 0).setDepth(5));
+  if (!i) fo(ut(W / 2, 548, 'B1 GOLPE · MANTÉN B1: BLOQUEO · B2 SALTO · B3 HACKEO', 13, 4001, YL), 800, 7000, 0);
+  WO.push(AD.image(560, 106, 'pb').setOrigin(0.5, 0).setDepth(5));
   d.sg.forEach(([, , x], k) => WO.push(AD.image(x, 124, 'sg' + i + k).setDepth(6)));
   [500, 1250, 1950, 2700].forEach((x, k) => {
     const e = { bx: 1, v: k % 2, t: 'bx', x, y: 420 + RND() * 120, z: 0, f: 1, hp: 1, w: 16, st: 'i', tm: 0, cd: 0, fl: 0 };
@@ -1235,13 +1242,13 @@ const hzd = (x, y, lane) => {
   tw(m, { alpha: 0.25, yoyo: true, repeat: 2, duration: 150 });
   if (!lane) {
     const b = AD.image(x, y - 420, st.i === 3 ? 'sp' : 'bx1').setScale(2.4).setOrigin(0.5, 1).setDepth(y).setTint(st.i === 3 ? 0xff7a30 : 0xffffff);
-    tw(b, { y, delay: 740, duration: 160 }); tw(b, { alpha: 0, delay: 1300, duration: 300 }, 1);
+    tw(b, { y, delay: 740, duration: 160 }); fo(b, 300, 1300);
   }
   later(900, () => {
     m.destroy();
     if (MODE !== 'p' || st.end) return;
     const hit = (o) => o.z < 30 && ABS(o.y - y) < (lane ? 16 : 22) && (lane || ABS(o.x - x) < 52);
-    if (lane) { tw(AD.rectangle(camX() + W / 2, y - 40, W, 12, 0xff3050).setDepth(1990), { alpha: 0, duration: 350 }, 1); SFX_zap(); } else boom(x, y - 20);
+    if (lane) { fo(AD.rectangle(camX() + W / 2, y - 40, W, 12, 0xff3050).setDepth(1990), 350); SFX_zap(); } else boom(x, y - 20);
     shake(150, 0.006);
     P.forEach((p) => { if (live(p) && hit(p)) hurtP(p, 16, 1, x, 1); });
     E.forEach((e) => { if (!e.boss && !e.bx && !e.dead && hit(e)) hurtE(e, 30, 1); });
@@ -1320,7 +1327,7 @@ const clearStage = () => {
 // ---------- HUD ----------
 const mkHud = () => {
   HUD = { g: ui(AD.graphics(), 5000), s: [] };
-  for (let pi = 0; pi < 2; pi++) {
+  rp(2, (pi) => {
     const x = pi ? W - 300 : 10;
     HUD.s[pi] = {
       x, k: -1,
@@ -1331,7 +1338,7 @@ const mkHud = () => {
       m: ut(x + 150, 38, '', 14, 5001, WH),
       cb: ut(x + 8, 94, '', 28, 5001, WH, 0),
     };
-  }
+  });
   // Continue countdown, shown only while every player is out.
   HUD.cd = dim(0.55, 5002);
   HUD.ct = ut(W / 2, 270, '', 56, 5003, YL);
@@ -1344,7 +1351,7 @@ const mkHud = () => {
 const drawHud = (now) => {
   const g = HUD.g;
   g.clear();
-  for (let pi = 0; pi < 2; pi++) {
+  rp(2, (pi) => {
     const h = HUD.s[pi], p = P[pi], x = h.x, on = live(p), col = p ? p.h.c : 0x555566;
     g.fillStyle(0x0c0816, 0.85).fillRect(x, 6, 290, 60);
     g.lineStyle(3, on && p.hp < 30 && (now / 200 | 0) % 2 ? 0xff3040 : col).strokeRect(x, 6, 290, 60);
@@ -1365,7 +1372,7 @@ const drawHud = (now) => {
       h.m.setText(p ? 'CONTINUAR? START' : 'P' + (pi + 1) + ' · PRESIONA START').setAlpha((now / 400 | 0) % 2 ? 1 : 0.35);
       if (p) h.sc.setText(String(p.sc).padStart(7, '0'));
     }
-  }
+  });
   const b = st.boss;
   if (b && !b.dead) {
     g.fillStyle(0x0c0816, 0.85).fillRect(180, 548, 440, 42);
